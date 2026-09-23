@@ -298,6 +298,7 @@ export function emptyLineItem(): QuotationFormValues["items"][number] {
     igstAmount: 0,
     amount: 0,
     total: 0,
+    stockAvailable: null,
   };
 }
 
@@ -492,7 +493,7 @@ showUPIDetails: q.showUPIDetails ?? false,
               igstAmount: item.igstAmount ?? 0,
               amount: item.amount ?? item.total ?? 0,
               total: item.total ?? item.amount ?? 0,
-              stockAvailable: (item as { stockAvailable?: number | null }).stockAvailable ?? null,
+              stockAvailable: null, // quotation never binds stock
             };
           })
         : [emptyLineItem()],

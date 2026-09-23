@@ -35,6 +35,12 @@ export type ItemSearchSelectProps = {
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  /**
+   * Show stock in dropdown meta line.
+   * - Quotation: false (item details only, no stock impact)
+   * - Invoice: true (default) — stock-aware flows
+   */
+  showStock?: boolean;
 };
 
 function stripUnsafe(raw: string, max = 200): string {
@@ -129,6 +135,7 @@ export default function ItemSearchSelect({
   placeholder = "Enter product name",
   disabled = false,
   className = "",
+  showStock = true,
 }: ItemSearchSelectProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState(value);
@@ -257,7 +264,7 @@ export default function ItemSearchSelect({
                     ₹{item.rate.toLocaleString("en-IN")} · {item.unit}
                     {item.taxRate != null ? ` · GST ${item.taxRate}%` : ""}
                     {item.hsnSac ? ` · HSN ${item.hsnSac}` : ""}
-                    {item.stock != null ? ` · Stock ${item.stock}` : ""}
+                    {showStock && item.stock != null ? ` · Stock ${item.stock}` : ""}
                   </p>
                 </div>
                 {selectedId === item.id ? (

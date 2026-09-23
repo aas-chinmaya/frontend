@@ -69,10 +69,8 @@ export function QuotationItemRow({
   const unitPrice =
     price != null && Number(price) > 0 ? Number(price) : Number(rate) || 0;
 
-  const qtyCap =
-    stockAvailable != null && stockAvailable >= 0
-      ? Math.min(MAX_QTY, stockAvailable)
-      : MAX_QTY;
+  /** Quotation: no stock cap — inventory is item-info only */
+  const qtyCap = MAX_QTY;
 
   const line = useMemo(
     () =>
@@ -102,13 +100,6 @@ export function QuotationItemRow({
     setValue(`${prefix}.igstAmount`, line.igstAmount, { shouldDirty: false });
   }, [line, prefix, setValue]);
 
-  useEffect(() => {
-    if (stockAvailable != null && Number(quantity) > stockAvailable) {
-      setValue(`${prefix}.quantity`, Math.max(0, stockAvailable), {
-        shouldDirty: true,
-      });
-    }
-  }, [stockAvailable, quantity, prefix, setValue]);
 
   const clearLine = () => {
     setValue(`${prefix}.itemId`, null, { shouldDirty: true });
@@ -172,16 +163,12 @@ export function QuotationItemRow({
         shouldDirty: true,
       });
     }
-    setValue(
-      `${prefix}.stockAvailable`,
-      item.stock != null ? item.stock : null,
-      { shouldDirty: true },
-    );
-    const nextQty = Math.min(
-      Math.max(Number(quantity) || 1, 1),
-      item.stock != null && item.stock >= 0 ? item.stock : MAX_QTY,
-    );
-    setValue(`${prefix}.quantity`, nextQty, { shouldDirty: true });
+    // Quotation: inventory is product master only — never bind/clamp to stock
+    setValue(`${prefix}.stockAvailable`, null, { shouldDirty: true });
+    const nextQty = Math.max(Number(quantity) || 1, 1);
+    setValue(`${prefix}.quantity`, Math.min(nextQty, MAX_QTY), {
+      shouldDirty: true,
+    });
     onSearchOpenChange(null);
   };
 
@@ -275,6 +262,7 @@ export function QuotationItemRow({
           <ItemSearchSelect
             value={itemName}
             onSelect={applyItem}
+            showStock={false}
             onQueryChange={(q) => setSafeText("itemName", q, 200)}
             onOpenChange={(open) => onSearchOpenChange(open ? index : null)}
             placeholder="Enter product name"
@@ -352,9 +340,8 @@ export function QuotationItemRow({
 
         {/* Row-2: stock hint under qty, empty fillers, actions at end */}
         <div className="col-start-3" />
-        <div className="text-center text-[9px] text-slate-400">
-          {stockAvailable != null ? `Stock ${stockAvailable}` : null}
-        </div>
+      
+        <div />
         <div />
         <div />
         <div />
@@ -374,6 +361,7 @@ export function QuotationItemRow({
             <ItemSearchSelect
               value={itemName}
               onSelect={applyItem}
+            showStock={false}
               onQueryChange={(q) => setSafeText("itemName", q, 200)}
               onOpenChange={(open) => onSearchOpenChange(open ? index : null)}
               placeholder="Enter product name"
@@ -404,7 +392,7 @@ export function QuotationItemRow({
           </div>
           <div>
             <label className="mb-0.5 block text-[10px] font-medium uppercase text-slate-400">
-              Qty{stockAvailable != null ? ` (max ${stockAvailable})` : ""}
+              Qty
             </label>
             <input
               type="number"

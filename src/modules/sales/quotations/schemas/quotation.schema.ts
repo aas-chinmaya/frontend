@@ -167,7 +167,7 @@ export const quotationItemSchema = z
     igstAmount: z.coerce.number().nonnegative().optional().default(0),
     amount: z.coerce.number().nonnegative().optional().default(0),
     total: z.coerce.number().nonnegative().optional().default(0),
-    /** Available stock from inventory (null = service / unlimited) */
+    /** Optional display-only; quotation never validates against stock */
     stockAvailable: z.number().nullable().optional(),
   })
   .superRefine((item, ctx) => {
@@ -195,17 +195,7 @@ export const quotationItemSchema = z
       }
     }
 
-    if (
-      item.stockAvailable != null &&
-      item.stockAvailable >= 0 &&
-      qty > item.stockAvailable
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `Only ${item.stockAvailable} in stock`,
-        path: ["quantity"],
-      });
-    }
+    // Quotation: no stock availability validation
 
     if (item.itemName && qty <= 0 && item.itemId) {
       // allow 0 qty only for empty draft lines without selection
