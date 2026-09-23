@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { Label } from "@/components/ui/label";
 
-/** Shared field chrome — same label size across sales forms */
+/** Shared field chrome — same density as Product Items table labels */
 export function FormField({
   label,
   required,
@@ -19,7 +19,7 @@ export function FormField({
 }) {
   return (
     <div className={className ?? "space-y-1"}>
-      <Label className="text-[11px] font-medium text-slate-500">
+      <Label className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
         {label}
         {required ? <span className="ml-0.5 text-red-500">*</span> : null}
       </Label>

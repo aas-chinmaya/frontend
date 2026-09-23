@@ -1,336 +1,478 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Minus, Plus } from "lucide-react";
-import { useMemo } from "react";
 import type { QuotationFormValues } from "../../types/quotation-form.types";
 import type { TaxType } from "../../types/quotation.types";
-import { calcLine, formatINR } from "../../utils/quotation-form.utils";
+import {
+  calcLine,
+  formatINR,
+  sanitizePlainText,
+} from "../../utils/quotation-form.utils";
 import ItemSearchSelect, {
   type SelectedItem,
 } from "@/modules/sales/shared/components/item-search-select";
+import {
+  SalesRowAddButton,
+  SalesRowRemoveButton,
+} from "@/modules/sales/shared/components/ui/sales-table";
 
 interface Props {
   index: number;
   onRemove: () => void;
   onAdd: () => void;
   canRemove: boolean;
+  isLast: boolean;
   taxType: TaxType;
+  searchOpenIndex: number | null;
+  onSearchOpenChange: (index: number | null) => void;
 }
+
+const MAX_QTY = 1_00_000;
+const MAX_PRICE = 10_00_00_000;
+
+const cell =
+  "h-8 w-full min-w-0 rounded border border-slate-200 bg-white px-1.5 text-xs text-slate-800 outline-none placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary/25";
 
 export function QuotationItemRow({
   index,
   onRemove,
   onAdd,
   canRemove,
+  isLast,
   taxType,
+  searchOpenIndex,
+  onSearchOpenChange,
 }: Props) {
-  const {
-    register,
-    setValue,
-    control,
-    formState: { errors },
-  } = useFormContext<QuotationFormValues>();
-
-  const itemErrors = errors.items?.[index];
+  const { setValue, control } = useFormContext<QuotationFormValues>();
   const isInter = taxType === "INTER_STATE";
+  const prefix = `items.${index}` as const;
+  const isSearchOpen = searchOpenIndex === index;
 
-  const quantity = useWatch({ control, name: `items.${index}.quantity` }) ?? 0;
-  const rate = useWatch({ control, name: `items.${index}.rate` }) ?? 0;
-  const price = useWatch({ control, name: `items.${index}.price` });
-  const discount = useWatch({ control, name: `items.${index}.discount` }) ?? 0;
+  const quantity = useWatch({ control, name: `${prefix}.quantity` }) ?? 0;
+  const rate = useWatch({ control, name: `${prefix}.rate` }) ?? 0;
+  const price = useWatch({ control, name: `${prefix}.price` });
+  const discount = useWatch({ control, name: `${prefix}.discount` }) ?? 0;
   const discountType =
-    useWatch({ control, name: `items.${index}.discountType` }) ?? "PERCENTAGE";
-  const taxRate = useWatch({ control, name: `items.${index}.taxRate` }) ?? 0;
-  const itemName = useWatch({ control, name: `items.${index}.itemName` }) ?? "";
-  const unit = useWatch({ control, name: `items.${index}.unit` }) ?? "PCS";
+    useWatch({ control, name: `${prefix}.discountType` }) ?? "PERCENTAGE";
+  const taxRate = useWatch({ control, name: `${prefix}.taxRate` }) ?? 0;
+  const itemName = useWatch({ control, name: `${prefix}.itemName` }) ?? "";
+  const unit = useWatch({ control, name: `${prefix}.unit` }) ?? "PCS";
   const description =
-    useWatch({ control, name: `items.${index}.description` }) ?? "";
-
+    useWatch({ control, name: `${prefix}.description` }) ?? "";
+  const hsnSac = useWatch({ control, name: `${prefix}.hsnSac` }) ?? "";
   const stockAvailable = useWatch({
     control,
-    name: `items.${index}.stockAvailable`,
+    name: `${prefix}.stockAvailable`,
   }) as number | null | undefined;
 
   const unitPrice =
     price != null && Number(price) > 0 ? Number(price) : Number(rate) || 0;
 
+  const qtyCap =
+    stockAvailable != null && stockAvailable >= 0
+      ? Math.min(MAX_QTY, stockAvailable)
+      : MAX_QTY;
+
   const line = useMemo(
     () =>
       calcLine(
         {
-          quantity,
+          quantity: Number(quantity) || 0,
           rate: unitPrice,
           price: unitPrice,
-          discount,
-          discountType,
-          taxRate,
+          discount: Number(discount) || 0,
+          discountType: discountType as "PERCENTAGE" | "FIXED",
+          taxRate: Number(taxRate) || 0,
         },
         taxType,
       ),
     [quantity, unitPrice, discount, discountType, taxRate, taxType],
   );
 
+  useEffect(() => {
+    setValue(`${prefix}.amount`, line.taxable, { shouldDirty: false });
+    setValue(`${prefix}.total`, line.total, { shouldDirty: false });
+    setValue(`${prefix}.taxAmount`, line.taxAmount, { shouldDirty: false });
+    setValue(`${prefix}.cgstRate`, line.cgstRate, { shouldDirty: false });
+    setValue(`${prefix}.cgstAmount`, line.cgstAmount, { shouldDirty: false });
+    setValue(`${prefix}.sgstRate`, line.sgstRate, { shouldDirty: false });
+    setValue(`${prefix}.sgstAmount`, line.sgstAmount, { shouldDirty: false });
+    setValue(`${prefix}.igstRate`, line.igstRate, { shouldDirty: false });
+    setValue(`${prefix}.igstAmount`, line.igstAmount, { shouldDirty: false });
+  }, [line, prefix, setValue]);
+
+  useEffect(() => {
+    if (stockAvailable != null && Number(quantity) > stockAvailable) {
+      setValue(`${prefix}.quantity`, Math.max(0, stockAvailable), {
+        shouldDirty: true,
+      });
+    }
+  }, [stockAvailable, quantity, prefix, setValue]);
+
+  const clearLine = () => {
+    setValue(`${prefix}.itemId`, null, { shouldDirty: true });
+    setValue(`${prefix}.itemName`, "", { shouldDirty: true });
+    setValue(`${prefix}.description`, null, { shouldDirty: true });
+    setValue(`${prefix}.hsnSac`, null, { shouldDirty: true });
+    setValue(`${prefix}.rate`, 0, { shouldDirty: true });
+    setValue(`${prefix}.price`, 0, { shouldDirty: true });
+    setValue(`${prefix}.quantity`, 1, { shouldDirty: true });
+    setValue(`${prefix}.unit`, "PCS", { shouldDirty: true });
+    setValue(`${prefix}.taxRate`, 18, { shouldDirty: true });
+    setValue(`${prefix}.discount`, 0, { shouldDirty: true });
+    setValue(`${prefix}.stockAvailable`, null, { shouldDirty: true });
+  };
+
   const applyItem = (item: SelectedItem | null) => {
     if (!item) {
-      setValue(`items.${index}.itemId`, null, { shouldDirty: true });
-      setValue(`items.${index}.stockAvailable`, null, { shouldDirty: true });
+      clearLine();
       return;
     }
-    setValue(`items.${index}.itemId`, item.id, {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
-    setValue(`items.${index}.itemName`, item.name, {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
-    setValue(`items.${index}.description`, item.description ?? null, {
+    setValue(`${prefix}.itemId`, item.id, { shouldDirty: true });
+    setValue(`${prefix}.itemName`, sanitizePlainText(item.name, 200), {
       shouldDirty: true,
     });
-    setValue(`items.${index}.rate`, item.rate, { shouldDirty: true });
-    setValue(`items.${index}.price`, item.rate, { shouldDirty: true });
-    setValue(`items.${index}.unit`, item.unit, { shouldDirty: true });
-    setValue(`items.${index}.taxRate`, item.taxRate, { shouldDirty: true });
-    if (item.hsnSac != null) {
-      setValue(`items.${index}.hsnSac`, item.hsnSac, { shouldDirty: true });
+    setValue(
+      `${prefix}.description`,
+      item.description
+        ? sanitizePlainText(item.description, 500) || null
+        : null,
+      { shouldDirty: true },
+    );
+    setValue(
+      `${prefix}.hsnSac`,
+      item.hsnSac
+        ? sanitizePlainText(item.hsnSac, 12).replace(/[^0-9A-Za-z]/g, "") ||
+            null
+        : null,
+      { shouldDirty: true },
+    );
+    setValue(`${prefix}.rate`, item.rate, { shouldDirty: true });
+    setValue(`${prefix}.price`, item.rate, { shouldDirty: true });
+    setValue(
+      `${prefix}.unit`,
+      sanitizePlainText(item.unit || "PCS", 20) || "PCS",
+      { shouldDirty: true },
+    );
+    const tax = Number(item.taxRate) || 18;
+    setValue(`${prefix}.taxRate`, tax, { shouldDirty: true });
+    if (item.cgstRate != null) {
+      setValue(`${prefix}.cgstRate`, Number(item.cgstRate) || 0, {
+        shouldDirty: true,
+      });
+    }
+    if (item.sgstRate != null) {
+      setValue(`${prefix}.sgstRate`, Number(item.sgstRate) || 0, {
+        shouldDirty: true,
+      });
+    }
+    if (item.igstRate != null) {
+      setValue(`${prefix}.igstRate`, Number(item.igstRate) || 0, {
+        shouldDirty: true,
+      });
     }
     setValue(
-      `items.${index}.stockAvailable`,
+      `${prefix}.stockAvailable`,
       item.stock != null ? item.stock : null,
       { shouldDirty: true },
     );
-    if (!quantity) {
-      setValue(`items.${index}.quantity`, 1, { shouldDirty: true });
-    }
+    const nextQty = Math.min(
+      Math.max(Number(quantity) || 1, 1),
+      item.stock != null && item.stock >= 0 ? item.stock : MAX_QTY,
+    );
+    setValue(`${prefix}.quantity`, nextQty, { shouldDirty: true });
+    onSearchOpenChange(null);
   };
 
-  return (
-    <tr className="group border-b border-slate-100 align-top">
-      <td className="w-8 px-1 py-2 text-center text-xs text-slate-400">
-        {index + 1}
-      </td>
+  const num = (field: "quantity" | "price" | "discount", raw: string) => {
+    let v = Number(raw);
+    if (Number.isNaN(v) || v < 0) v = 0;
+    if (field === "quantity") {
+      setValue(`${prefix}.quantity`, Math.min(v, qtyCap), { shouldDirty: true });
+      return;
+    }
+    if (field === "price") {
+      v = Math.min(v, MAX_PRICE);
+      setValue(`${prefix}.rate`, v, { shouldDirty: true });
+      setValue(`${prefix}.price`, v, { shouldDirty: true });
+      return;
+    }
+    const maxDisc =
+      discountType === "PERCENTAGE"
+        ? 100
+        : Math.min(MAX_PRICE, unitPrice * (Number(quantity) || 0) || MAX_PRICE);
+    setValue(`${prefix}.discount`, Math.min(v, maxDisc), { shouldDirty: true });
+  };
 
-      <td className="min-w-[180px] px-1.5 py-2 sm:min-w-[220px]">
-        <div className="space-y-1.5">
+  const setSafeText = (
+    field: "itemName" | "description" | "hsnSac",
+    raw: string,
+    max: number,
+  ) => {
+    let clean = sanitizePlainText(raw, max);
+    if (field === "hsnSac") {
+      clean = clean.replace(/[^0-9A-Za-z]/g, "").slice(0, 12);
+    }
+    setValue(
+      `${prefix}.${field}`,
+      field === "itemName" ? clean : clean || null,
+      { shouldDirty: true },
+    );
+  };
+
+  const taxCell = itemName ? (
+    isInter ? (
+      <div className="text-[10px] leading-tight text-slate-600">
+        <div className="font-medium text-slate-700">
+          IGST {line.igstRate || 0}%
+        </div>
+        <div className="tabular-nums">₹{formatINR(line.igstAmount)}</div>
+      </div>
+    ) : (
+      <div className="space-y-0.5 text-[10px] leading-tight text-slate-600">
+        <div>
+          <span className="font-medium text-slate-700">
+            CGST {line.cgstRate || 0}%
+          </span>{" "}
+          <span className="tabular-nums">₹{formatINR(line.cgstAmount)}</span>
+        </div>
+        <div>
+          <span className="font-medium text-slate-700">
+            SGST {line.sgstRate || 0}%
+          </span>{" "}
+          <span className="tabular-nums">₹{formatINR(line.sgstAmount)}</span>
+        </div>
+      </div>
+    )
+  ) : (
+    <span className="text-[10px] text-slate-400">—</span>
+  );
+
+  const actions = (
+    <div className="flex items-center gap-1">
+      {isLast ? <SalesRowAddButton onClick={onAdd} /> : null}
+      {canRemove ? <SalesRowRemoveButton onClick={onRemove} /> : null}
+    </div>
+  );
+
+  return (
+    <div
+      className={`relative border-b border-slate-100 last:border-b-0 ${
+        isSearchOpen ? "z-50" : "z-0"
+      }`}
+      style={{ isolation: isSearchOpen ? "auto" : "isolate" }}
+    >
+      {/* ===== Desktop: product col 2 rows; total + icons on 2nd row ===== */}
+      <div className="hidden lg:grid lg:grid-cols-[2rem_minmax(0,30%)_1fr_1fr_0.7fr_1.1fr_0.9fr_1.3fr_1.2fr] lg:gap-x-1.5 lg:gap-y-1 lg:px-2 lg:py-2">
+        {/* Sr — spans both rows */}
+        <div className="row-span-2 flex items-start justify-center pt-2 text-xs text-slate-400">
+          {index + 1}
+        </div>
+
+        {/* Product name (row 1) */}
+        <div className="relative min-w-0">
           <ItemSearchSelect
-            label=""
             value={itemName}
             onSelect={applyItem}
-            onQueryChange={(q) =>
-              setValue(`items.${index}.itemName`, q, {
-                shouldDirty: true,
-                shouldValidate: true,
-              })
-            }
-            placeholder="Search item"
+            onQueryChange={(q) => setSafeText("itemName", q, 200)}
+            onOpenChange={(open) => onSearchOpenChange(open ? index : null)}
+            placeholder="Enter product name"
           />
-          <textarea
-            placeholder="Note"
-            rows={2}
-            value={description || ""}
-            onChange={(e) =>
-              setValue(`items.${index}.description`, e.target.value || null, {
-                shouldDirty: true,
-              })
-            }
-            className="w-full resize-none rounded-md border border-amber-100 bg-amber-50/80 px-2 py-1 text-xs leading-snug text-slate-600 placeholder:text-slate-400 focus:border-amber-200 focus:outline-none"
-          />
-          {itemErrors?.itemName && (
-            <p className="text-[11px] text-red-500">
-              {itemErrors.itemName.message}
-            </p>
-          )}
         </div>
-      </td>
 
-      <td className="w-16 px-1 py-2 sm:w-20">
-        <Input
-          type="number"
-          step="any"
-          min={0}
-          max={stockAvailable != null ? stockAvailable : 100000}
-          className="h-8 px-1 text-center text-xs tabular-nums sm:h-9 sm:text-sm"
-          {...register(`items.${index}.quantity`, {
-            valueAsNumber: true,
-            onChange: (e) => {
-              let v = Number(e.target.value);
-              if (Number.isNaN(v) || v < 0) v = 0;
-              if (v > 100000) v = 100000;
-              if (stockAvailable != null && v > stockAvailable) {
-                v = stockAvailable;
-              }
-              setValue(`items.${index}.quantity`, v, {
-                shouldDirty: true,
-                shouldValidate: true,
-              });
-            },
-          })}
-        />
-        {stockAvailable != null && (
-          <p className="mt-0.5 text-[9px] text-slate-400">
-            Stock {stockAvailable}
-          </p>
-        )}
-        {itemErrors?.quantity && (
-          <p className="text-[10px] text-red-500">
-            {(itemErrors.quantity as { message?: string }).message}
-          </p>
-        )}
-      </td>
-
-      <td className="hidden w-14 px-1 py-2 sm:table-cell">
-        <Input
-          readOnly
-          value={unit || "PCS"}
-          className="h-8 cursor-default bg-slate-50 px-1 text-center text-[10px] uppercase text-slate-600 sm:h-9 sm:text-xs"
-          tabIndex={-1}
-        />
-      </td>
-
-      <td className="w-20 px-1 py-2 sm:w-24">
-        <Input
-          type="number"
-          step="any"
-          min={0}
-          className="h-8 px-1 text-right text-xs tabular-nums sm:h-9 sm:text-sm"
-          value={unitPrice || ""}
-          onChange={(e) => {
-            let v = e.target.value === "" ? 0 : Number(e.target.value);
-            if (Number.isNaN(v) || v < 0) v = 0;
-            if (v > 10_00_00_000) v = 10_00_00_000;
-            setValue(`items.${index}.rate`, v, { shouldDirty: true });
-            setValue(`items.${index}.price`, v, { shouldDirty: true });
-          }}
-          max={100000000}
-        />
-      </td>
-
-      <td className="w-24 px-1 py-2">
-        <div className="flex items-center gap-0.5">
-          <Input
+        {/* Row-1 fields: HSN Qty UOM Price Disc Tax Total(placeholder align) */}
+        <div>
+          <input
+            value={hsnSac || ""}
+            maxLength={12}
+            placeholder="HSN/SAC"
+            onChange={(e) => setSafeText("hsnSac", e.target.value, 12)}
+            className={`${cell} text-center`}
+          />
+        </div>
+        <div>
+          <input
             type="number"
-            step="any"
             min={0}
-            className="h-8 min-w-0 flex-1 px-1 text-center text-xs tabular-nums sm:h-9"
-            {...register(`items.${index}.discount`, {
-              valueAsNumber: true,
-              onChange: (e) => {
-                let v = Number(e.target.value);
-                if (Number.isNaN(v) || v < 0) v = 0;
-                if (discountType === "PERCENTAGE" && v > 100) v = 100;
-                if (discountType === "FIXED" && v > 10_00_00_000) v = 10_00_00_000;
-                setValue(`items.${index}.discount`, v, {
-                  shouldDirty: true,
-                  shouldValidate: true,
-                });
-              },
-            })}
+            max={qtyCap}
+            inputMode="decimal"
+            className={`${cell} text-center tabular-nums`}
+            value={quantity || ""}
+            placeholder="Qty"
+            onChange={(e) => num("quantity", e.target.value)}
           />
-          <button
-            type="button"
-            title="Toggle % / ₹"
-            onClick={() =>
-              setValue(
-                `items.${index}.discountType`,
-                discountType === "PERCENTAGE" ? "FIXED" : "PERCENTAGE",
-                { shouldDirty: true },
-              )
-            }
-            className="h-8 w-7 shrink-0 rounded border border-slate-200 text-[10px] font-semibold text-slate-600 hover:bg-slate-50 sm:h-9 sm:w-8 sm:text-[11px]"
-          >
-            {discountType === "PERCENTAGE" ? "%" : "₹"}
-          </button>
         </div>
-      </td>
+        <div className="flex h-8 items-center justify-center">
+          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-600">
+            {itemName ? unit || "PCS" : "UOM"}
+          </span>
+        </div>
+        <div>
+          <input
+            type="number"
+            min={0}
+            max={MAX_PRICE}
+            inputMode="decimal"
+            className={`${cell} text-right tabular-nums`}
+            value={unitPrice || ""}
+            placeholder="0"
+            onChange={(e) => num("price", e.target.value)}
+          />
+        </div>
+        <div>
+          <input
+            type="number"
+            min={0}
+            inputMode="decimal"
+            className={`${cell} text-center tabular-nums`}
+            value={discount || ""}
+            placeholder="0"
+            onChange={(e) => num("discount", e.target.value)}
+          />
+        </div>
+        <div className="flex items-center justify-center">{taxCell}</div>
+        <div className="flex h-8 items-center justify-end">
+          <span className="text-xs font-semibold tabular-nums text-slate-800">
+            {itemName ? formatINR(line.total) : "—"}
+          </span>
+        </div>
 
-      {/* Tax — read-only (from inventory / calc) */}
-      <td className="w-20 px-1 py-2 text-center sm:w-24">
-        {isInter ? (
-          <div className="space-y-0.5">
-            <p className="text-[10px] font-medium tabular-nums text-slate-700">
-              {line.igstRate}%
-            </p>
-            <p className="text-[9px] tabular-nums text-slate-400">
-              {formatINR(line.igstAmount)}
-            </p>
+        {/* Product note (row 2) — same product column */}
+        <div className="min-w-0">
+          <textarea
+            rows={2}
+            maxLength={500}
+            placeholder="Item note…"
+            value={description || ""}
+            onChange={(e) => setSafeText("description", e.target.value, 500)}
+            className="w-full resize-none rounded border-0 bg-amber-50 px-2 py-1 text-[11px] leading-snug text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-amber-300"
+          />
+        </div>
+
+        {/* Row-2: stock hint under qty, empty fillers, actions at end */}
+        <div className="col-start-3" />
+        <div className="text-center text-[9px] text-slate-400">
+          {stockAvailable != null ? `Stock ${stockAvailable}` : null}
+        </div>
+        <div />
+        <div />
+        <div />
+        <div />
+        <div className="flex items-center justify-end gap-1.5">
+          {actions}
+        </div>
+      </div>
+
+      {/* ===== Mobile / tablet ===== */}
+      <div className="space-y-2.5 px-3 py-3 lg:hidden">
+        <div className="flex gap-2">
+          <span className="mt-2 w-5 shrink-0 text-center text-[11px] text-slate-400">
+            {index + 1}
+          </span>
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <ItemSearchSelect
+              value={itemName}
+              onSelect={applyItem}
+              onQueryChange={(q) => setSafeText("itemName", q, 200)}
+              onOpenChange={(open) => onSearchOpenChange(open ? index : null)}
+              placeholder="Enter product name"
+            />
+            <textarea
+              rows={2}
+              maxLength={500}
+              placeholder="Item note…"
+              value={description || ""}
+              onChange={(e) => setSafeText("description", e.target.value, 500)}
+              className="w-full resize-none rounded border-0 bg-amber-50 px-2.5 py-1.5 text-[11px] leading-snug text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-amber-300"
+            />
           </div>
-        ) : (
-          <div className="space-y-0.5">
-            <p className="text-[10px] leading-tight text-slate-600">
-              <span className="text-slate-400">C</span>
-              {line.cgstRate}%{" "}
-              <span className="tabular-nums text-slate-500">
-                {formatINR(line.cgstAmount)}
+        </div>
+
+        <div className="ml-7 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <div>
+            <label className="mb-0.5 block text-[10px] font-medium uppercase text-slate-400">
+              HSN / SAC
+            </label>
+            <input
+              value={hsnSac || ""}
+              maxLength={12}
+              placeholder="—"
+              onChange={(e) => setSafeText("hsnSac", e.target.value, 12)}
+              className={`${cell} text-center`}
+            />
+          </div>
+          <div>
+            <label className="mb-0.5 block text-[10px] font-medium uppercase text-slate-400">
+              Qty{stockAvailable != null ? ` (max ${stockAvailable})` : ""}
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={qtyCap}
+              inputMode="decimal"
+              className={`${cell} text-center tabular-nums`}
+              value={quantity || ""}
+              placeholder="1"
+              onChange={(e) => num("quantity", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="mb-0.5 block text-[10px] font-medium uppercase text-slate-400">
+              UOM
+            </label>
+            <div className="flex h-8 items-center">
+              <span className="rounded bg-slate-100 px-2 py-1 text-[10px] font-semibold uppercase text-slate-600">
+                {itemName ? unit || "PCS" : "—"}
               </span>
-            </p>
-            <p className="text-[10px] leading-tight text-slate-600">
-              <span className="text-slate-400">S</span>
-              {line.sgstRate}%{" "}
-              <span className="tabular-nums text-slate-500">
-                {formatINR(line.sgstAmount)}
-              </span>
-            </p>
+            </div>
           </div>
-        )}
-        <input
-          type="hidden"
-          {...register(`items.${index}.taxRate`, { valueAsNumber: true })}
-        />
-      </td>
-
-      <td className="w-20 px-1 py-2 text-right sm:w-24">
-        <span className="text-xs font-medium tabular-nums text-slate-900 sm:text-sm">
-          {formatINR(line.total)}
-        </span>
-      </td>
-
-      <td className="w-16 px-0.5 py-2">
-        <TooltipProvider delay={150}>
-          <div className="flex items-center justify-center gap-0.5">
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    type="button"
-                    size="icon"
-                    onClick={onAdd}
-                    className="h-7 w-7 bg-emerald-600 text-white hover:bg-emerald-700 sm:h-8 sm:w-8"
-                  />
-                }
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </TooltipTrigger>
-              <TooltipContent side="top">Add line</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    type="button"
-                    size="icon"
-                    onClick={onRemove}
-                    disabled={!canRemove}
-                    className="h-7 w-7 bg-red-500 text-white hover:bg-red-600 disabled:opacity-30 sm:h-8 sm:w-8"
-                  />
-                }
-              >
-                <Minus className="h-3.5 w-3.5" />
-              </TooltipTrigger>
-              <TooltipContent side="top">Remove line</TooltipContent>
-            </Tooltip>
+          <div>
+            <label className="mb-0.5 block text-[10px] font-medium uppercase text-slate-400">
+              Price (₹)
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={MAX_PRICE}
+              inputMode="decimal"
+              className={`${cell} text-right tabular-nums`}
+              value={unitPrice || ""}
+              placeholder="0"
+              onChange={(e) => num("price", e.target.value)}
+            />
           </div>
-        </TooltipProvider>
-      </td>
-    </tr>
+          <div>
+            <label className="mb-0.5 block text-[10px] font-medium uppercase text-slate-400">
+              Discount
+            </label>
+            <input
+              type="number"
+              min={0}
+              inputMode="decimal"
+              className={`${cell} text-center tabular-nums`}
+              value={discount || ""}
+              placeholder="0"
+              onChange={(e) => num("discount", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="mb-0.5 block text-[10px] font-medium uppercase text-slate-400">
+              {isInter ? "IGST" : "CGST / SGST"}
+            </label>
+            <div className="min-h-8 rounded border border-slate-100 bg-slate-50 px-2 py-1">
+              {taxCell}
+            </div>
+          </div>
+        </div>
+
+        <div className="ml-7 flex items-center justify-between border-t border-slate-50 pt-2">
+          <span className="text-xs font-semibold tabular-nums text-slate-800">
+            Total: {itemName ? formatINR(line.total) : "—"}
+          </span>
+          {actions}
+        </div>
+      </div>
+    </div>
   );
 }

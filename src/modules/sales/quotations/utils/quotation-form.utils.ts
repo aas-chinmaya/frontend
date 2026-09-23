@@ -33,6 +33,31 @@ function toNum(v: unknown, fallback = 0) {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 }
+
+/** Strip HTML tags, scripts, event handlers, and control chars from free-text fields */
+export function sanitizePlainText(raw: unknown, maxLen = 1000): string {
+  if (raw == null) return "";
+  let s = String(raw);
+  // Strip HTML tags and common entities
+  s = s.replace(/<[^>]*>/g, " ");
+  s = s.replace(/&lt;/gi, " ").replace(/&gt;/gi, " ").replace(/&quot;/gi, '"');
+  // Neutralize dangerous protocols / handlers
+  s = s.replace(/javascript\s*:/gi, "");
+  s = s.replace(/vbscript\s*:/gi, "");
+  s = s.replace(/data\s*:\s*text\/html/gi, "");
+  s = s.replace(/on\w+\s*=/gi, "");
+  // Strip raw URLs / links
+  s = s.replace(/https?:\/\/[^\s]+/gi, "");
+  s = s.replace(/www\.[^\s]+/gi, "");
+  s = s.replace(/ftp:\/\/[^\s]+/gi, "");
+  // Control chars
+  s = s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "");
+  // Collapse whitespace
+  s = s.replace(/\s+/g, " ").trim();
+  if (maxLen > 0 && s.length > maxLen) s = s.slice(0, maxLen);
+  return s;
+}
+
 /** Ensure API gets full ISO datetime (date-only inputs → start/end of day) */
 export function toIsoDateTime(
   value: string | null | undefined,
@@ -257,7 +282,7 @@ export function emptyLineItem(): QuotationFormValues["items"][number] {
     itemName: "",
     description: null,
     hsnSac: null,
-    quantity: 0,
+    quantity: 1,
     unit: "PCS",
     rate: 0,
     price: 0,
@@ -548,6 +573,7 @@ businessUPIId: business?.upiId ?? null,
 
 showBankDetails: false,
 showUPIDetails: false,
+    businessLogo: (business as any)?.logo ?? null,
   };
 }
 
@@ -645,6 +671,8 @@ return {
   showUPIDetails:
     rest.showUPIDetails ?? false,
 
+  businessLogo: rest.businessLogo || null,
+
   ...(rest.showBankDetails
     ? {
         businessBankName:
@@ -713,9 +741,15 @@ return {
     return {
       id: item.id,
       itemId: item.itemId || null,
-      itemName: item.itemName || "",
-      description: item.description || null,
-      hsnSac: item.hsnSac || null,
+      itemName: sanitizePlainText(item.itemName, 200),
+      description: (() => {
+        const d = sanitizePlainText(item.description, 1000);
+        return d || null;
+      })(),
+      hsnSac: (() => {
+        const h = sanitizePlainText(item.hsnSac, 12).replace(/[^0-9A-Za-z]/g, "");
+        return h || null;
+      })(),
       quantity: clampQty(item.quantity),
       unit: item.unit || null,
       rate: clampMoney(unitPrice),
@@ -752,9 +786,15 @@ return {
   roundOffAmount: rest.roundOffAmount,
   grandTotal: rest.grandTotal,
 
-  notes: rest.notes || null,
-  termsAndConditions:
-    rest.termsAndConditions || null,
+  notes: (() => {
+    const n = sanitizePlainText(rest.notes, 10000);
+    return n || null;
+  })(),
+  termsAndConditions: (() => {
+    // Terms may contain minimal formatting from editor — strip scripts/tags aggressively
+    const t = sanitizePlainText(rest.termsAndConditions, 10000);
+    return t || null;
+  })(),
   signature: rest.signature || null,
   status: (rest as { status?: string }).status || "DRAFT",
 };
@@ -818,4 +858,40 @@ export function amountInWords(amount: number): string {
   if (hundred) parts.push(threeDigits(hundred));
 
   return `${parts.join(" ")} Rupees Only`;
+}
+
+
+/** List filter: period key → fromDate / toDate (YYYY-MM-DD) */
+export function quotationDateRange(
+  period: string,
+): { fromDate?: string; toDate?: string } {
+  if (period === "all") return {};
+  const now = new Date();
+  const fmt = (d: Date) => d.toISOString().split("T")[0];
+  switch (period) {
+    case "today":
+      return { fromDate: fmt(now), toDate: fmt(now) };
+    case "7d": {
+      const from = new Date(now);
+      from.setDate(now.getDate() - 6);
+      return { fromDate: fmt(from), toDate: fmt(now) };
+    }
+    case "30d": {
+      const from = new Date(now);
+      from.setDate(now.getDate() - 29);
+      return { fromDate: fmt(from), toDate: fmt(now) };
+    }
+    case "month":
+      return {
+        fromDate: fmt(new Date(now.getFullYear(), now.getMonth(), 1)),
+        toDate: fmt(now),
+      };
+    case "year":
+      return {
+        fromDate: fmt(new Date(now.getFullYear(), 0, 1)),
+        toDate: fmt(now),
+      };
+    default:
+      return {};
+  }
 }

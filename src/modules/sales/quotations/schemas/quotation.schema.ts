@@ -40,10 +40,16 @@ export const LIMITS = {
 } as const;
 
 const SAFE_TEXT_RE =
-  /<script|javascript:|on\w+\s*=|data:text\/html|<\s*iframe/i;
+  /<script|javascript\s*:|vbscript\s*:|on\w+\s*=|data\s*:\s*text\/html|<\s*iframe|<\s*object|<\s*embed|<\s*link\b/i;
 
 function stripControl(s: string) {
-  return s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").trim();
+  return s
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
+    .replace(/https?:\/\/[^\s]+/gi, "")
+    .replace(/www\.[^\s]+/gi, "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function noHarmful(val: string, ctx: z.RefinementCtx) {
@@ -59,6 +65,36 @@ const optionalEmail = z
   .union([z.string().email("Invalid email"), z.literal(""), z.null()])
   .optional()
   .transform((v) => (v === "" || v === undefined ? null : v));
+
+
+
+const phoneRequired = z
+  .string()
+  .min(1, "Phone is required")
+  .max(LIMITS.PHONE)
+  .transform((v) => stripControl(v))
+  .refine(
+    (v) => /^\+?[0-9]{8,15}$/.test(v.replace(/[\s-]/g, "")),
+    "Enter phone with country code (e.g. +919876543210)",
+  );
+
+
+const pincodeRequired = z
+  .string()
+  .min(1, "Pincode is required")
+  .regex(/^[0-9]{6}$/, "Pincode must be 6 digits");
+
+const pincodeSchema = z
+  .union([
+    z.literal(""),
+    z.null(),
+    z
+      .string()
+      .regex(/^[0-9]{6}$/, "Pincode must be 6 digits"),
+  ])
+  .optional()
+  .nullable();
+
 
 const optionalString = z
   .union([z.string(), z.literal(""), z.null()])
@@ -103,7 +139,13 @@ export const quotationItemSchema = z
   .object({
     id: z.string().optional(),
     itemId: z.string().nullable().optional(),
-    itemName: safeText(LIMITS.NAME, "Item name is required"),
+    itemName: z
+      .string()
+      .max(LIMITS.NAME)
+      .optional()
+      .default("")
+      .transform((v) => stripControl(String(v || "")).slice(0, LIMITS.NAME))
+      .superRefine((v, ctx) => noHarmful(v, ctx)),
     description: optionalSafeText(LIMITS.DESCRIPTION),
     hsnSac: optionalSafeText(LIMITS.HSN),
     quantity: z.coerce
@@ -200,7 +242,7 @@ export const quotationBaseSchema = z.object({
   businessCity: optionalSafeText(LIMITS.CITY),
   businessState: optionalSafeText(LIMITS.CITY),
   businessStateCode: optionalSafeText(10),
-  businessPincode: optionalSafeText(LIMITS.PINCODE),
+  businessPincode: pincodeSchema,
   businessCountry: optionalSafeText(LIMITS.CITY),
 
   businessBankName: optionalSafeText(LIMITS.COMPANY),
@@ -210,23 +252,24 @@ export const quotationBaseSchema = z.object({
   businessUPIId: optionalSafeText(100),
   showBankDetails: z.boolean().optional().default(false),
   showUPIDetails: z.boolean().optional().default(false),
+  businessLogo: z.string().max(500_000).nullable().optional(),
 
   prospectName: safeText(LIMITS.NAME, "Customer name is required"),
   prospectCompanyName: optionalSafeText(LIMITS.COMPANY),
   prospectGSTIN: optionalSafeText(LIMITS.GSTIN),
   prospectPAN: optionalSafeText(LIMITS.PAN),
-  prospectPhone: optionalSafeText(LIMITS.PHONE),
+  prospectPhone: phoneRequired,
   prospectEmail: optionalEmail,
-  prospectAddressLine1: optionalSafeText(LIMITS.ADDRESS),
+  prospectAddressLine1: safeText(LIMITS.ADDRESS, "Address is required"),
   prospectAddressLine2: optionalSafeText(LIMITS.ADDRESS),
-  prospectCity: optionalSafeText(LIMITS.CITY),
-  prospectState: optionalSafeText(LIMITS.CITY),
+  prospectCity: safeText(LIMITS.CITY, "City is required"),
+  prospectState: safeText(LIMITS.CITY, "State is required"),
   prospectStateCode: optionalSafeText(10),
-  prospectPincode: optionalSafeText(LIMITS.PINCODE),
-  prospectCountry: optionalSafeText(LIMITS.CITY),
+  prospectPincode: pincodeRequired,
+  prospectCountry: safeText(LIMITS.CITY, "Country is required"),
 
   customerId: z.string().nullable().optional(),
-  placeOfSupply: optionalSafeText(LIMITS.CITY),
+  placeOfSupply: safeText(LIMITS.CITY, "Place of supply is required"),
   placeOfSupplyCode: optionalSafeText(10),
   taxType: taxTypeSchema.optional().default("INTRA_STATE"),
   reverseCharge: z.boolean().optional().default(false),
@@ -260,6 +303,35 @@ export const quotationBaseSchema = z.object({
 
 export const quotationCreateSchema = quotationBaseSchema.superRefine(
   (data, ctx) => {
+    const strip = (html: string) => (html || "").replace(/<[^>]+>/g, "").trim();
+    if (!strip(data.termsAndConditions || "")) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Terms & conditions are required",
+        path: ["termsAndConditions"],
+      });
+    }
+    const filledItems = (data.items || []).filter(
+      (it) => (it.itemName || "").trim().length > 0,
+    );
+    if (filledItems.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Add at least one item",
+        path: ["items"],
+      });
+    }
+    for (const it of filledItems) {
+      if (!it.quantity || Number(it.quantity) <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Quantity must be greater than 0",
+          path: ["items"],
+        });
+        break;
+      }
+    }
+
     if (data.validUntil && data.quotationDate) {
       const a = new Date(data.quotationDate);
       const b = new Date(data.validUntil);

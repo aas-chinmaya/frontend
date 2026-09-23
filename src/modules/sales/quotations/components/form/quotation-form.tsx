@@ -33,11 +33,13 @@ import { QuotationIssuerFields } from "./quotation-issuer-fields";
 import { QuotationItemsSection } from "./quotation-items-section";
 import { QuotationSummary } from "./quotation-summary";
 import { QuotationFormActions } from "./quotation-form-actions";
+import { SalesSectionCard } from "@/modules/sales/shared/components/ui/sales-table";
 
 export function QuotationForm({
   mode,
   quotation,
   onSuccess,
+  onCancel,
 }: QuotationFormProps) {
   const [createQuotation, { isLoading: isCreating }] =
     useCreateQuotationMutation();
@@ -46,6 +48,26 @@ export function QuotationForm({
 
   const { data: session } = useBusiness();
   const isSubmitting = isCreating || isUpdating;
+
+  const handleReset = () => {
+    if (mode === "edit" && quotation) {
+      reset(
+        mapQuotationToFormValues(
+          quotation,
+          session?.business?.id,
+          session?.user?.id,
+        ),
+      );
+    } else {
+      reset({
+        ...getDefaultQuotationValues(
+          session?.business?.id ?? "",
+          session?.user?.id ?? "",
+        ),
+        ...getSessionFormDefaults(session),
+      });
+    }
+  };
 
   const isFinalized =
     mode === "edit" &&
@@ -168,11 +190,81 @@ export function QuotationForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, session?.business?.id, session?.user?.id]);
 
+
+  const firstErrorMessage = (errs: Record<string, any>): string => {
+    const labels: Record<string, string> = {
+      prospectName: "Customer name",
+      prospectPhone: "Customer phone",
+      prospectEmail: "Customer email",
+      prospectAddressLine1: "Customer address",
+      prospectCity: "Customer city",
+      prospectPincode: "Customer pincode",
+      prospectState: "Customer state",
+      prospectCountry: "Customer country",
+      placeOfSupply: "Place of supply",
+      quotationDate: "Quotation date",
+      validUntil: "Valid until",
+      termsAndConditions: "Terms & conditions",
+      signature: "Authorized signatory",
+      items: "Product items",
+      businessName: "Business name",
+    };
+
+    const walk = (obj: any, path: string[] = []): string | null => {
+      if (!obj || typeof obj !== "object") return null;
+      if (typeof obj.message === "string" && obj.message) {
+        const key = path[0] || "";
+        const label = labels[key] || key || "Field";
+        const msg = obj.message;
+        // Prefer "Label: message" when message is generic
+        if (msg.toLowerCase().includes("required") || msg.length < 40) {
+          return `${label}: ${msg}`;
+        }
+        return msg;
+      }
+      for (const k of Object.keys(obj)) {
+        if (k === "ref" || k === "type" || k === "types") continue;
+        const found = walk(obj[k], path.concat(k));
+        if (found) return found;
+      }
+      return null;
+    };
+
+    return walk(errs) || "Please fix the highlighted fields";
+  };
+
   const submitWithStatus = async (status: "DRAFT" | "FINALIZED") => {
     const values = form.getValues();
     const valid = await form.trigger();
     if (!valid) {
-      notify.error("Please fix the highlighted fields");
+      let msg = firstErrorMessage(form.formState.errors as Record<string, any>);
+      // Fallback: parse values so toast always names the missing field
+      if (msg === "Please fix the highlighted fields") {
+        try {
+          quotationCreateSchema.parse(form.getValues());
+        } catch (e: any) {
+          const issue = e?.issues?.[0] || e?.errors?.[0];
+          if (issue?.message) {
+            const path = Array.isArray(issue.path) ? issue.path[0] : "";
+            const labels: Record<string, string> = {
+              prospectName: "Customer name",
+              prospectPhone: "Customer phone",
+              prospectAddressLine1: "Customer address",
+              prospectCity: "Customer city",
+              prospectPincode: "Customer pincode",
+              prospectState: "Customer state",
+              placeOfSupply: "Place of supply",
+              quotationDate: "Quotation date",
+              validUntil: "Valid until",
+              termsAndConditions: "Terms & conditions",
+              items: "Product items",
+            };
+            const label = (path && labels[String(path)]) || String(path || "Field");
+            msg = `${label}: ${issue.message}`;
+          }
+        }
+      }
+      notify.error(msg);
       return;
     }
 
@@ -238,7 +330,7 @@ export function QuotationForm({
         onSubmit={(e) => {
           e.preventDefault();
         }}
-        className="w-full space-y-4 pb-10"
+        className="flex w-full min-w-0 flex-col space-y-6 pb-10"
         noValidate
       >
       {isFinalized && (
@@ -246,31 +338,22 @@ export function QuotationForm({
           This quotation is finalized — editing is disabled.
         </div>
       )}
-      <fieldset disabled={!!isFinalized} className="min-w-0 space-y-4">
-        {/* Same row: Customer | Issuer */}
+      <fieldset disabled={!!isFinalized} className="min-w-0 space-y-6">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-            <h2 className="mb-4 text-sm font-semibold text-slate-800">
-              Customer information
-            </h2>
+          <SalesSectionCard title="Customer information">
             <QuotationCustomerFields />
-          </section>
-
-          <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-            <h2 className="mb-4 text-sm font-semibold text-slate-800">
-              Issuer details
-            </h2>
+          </SalesSectionCard>
+          <SalesSectionCard title="Issuer details">
             <QuotationIssuerFields />
-          </section>
+          </SalesSectionCard>
         </div>
 
-        {/* Items + payment + notes + summary + signature */}
-        <section className="space-y-6 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-          <QuotationItemsSection />
-          <div className="border-t border-slate-100 pt-5">
+        <SalesSectionCard title="Product Items">
+          <QuotationItemsSection embedded />
+          <div className="mt-6 border-t border-slate-100 pt-5">
             <QuotationSummary />
           </div>
-        </section>
+        </SalesSectionCard>
 
         </fieldset>
         <QuotationFormActions
@@ -278,6 +361,8 @@ export function QuotationForm({
           isSubmitting={isSubmitting}
           readOnly={!!isFinalized}
           onSubmitIntent={submitWithStatus}
+          onReset={handleReset}
+          onCancel={onCancel}
         />
       </form>
     </FormProvider>

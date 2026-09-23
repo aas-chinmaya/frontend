@@ -1,9 +1,5 @@
 "use client";
 
-/**
- * Reusable customer / prospect / buyer block for sales documents.
- * Pass field names so quotation (prospect*) and invoice (buyer*) both reuse this UI.
- */
 import { useFormContext } from "react-hook-form";
 import { Input } from "@/components/ui/input";
 import {
@@ -43,14 +39,11 @@ export type CustomerPartyFieldNames = {
   stateCode: string;
   pincode: string;
   country: string;
-  /** optional quotation/invoice tax fields */
   placeOfSupply?: string;
   placeOfSupplyCode?: string;
-  reverseCharge?: string;
   taxType?: string;
 };
 
-/** Quotation defaults */
 export const PROSPECT_FIELD_NAMES: CustomerPartyFieldNames = {
   customerId: "customerId",
   name: "prospectName",
@@ -68,11 +61,9 @@ export const PROSPECT_FIELD_NAMES: CustomerPartyFieldNames = {
   country: "prospectCountry",
   placeOfSupply: "placeOfSupply",
   placeOfSupplyCode: "placeOfSupplyCode",
-  reverseCharge: "reverseCharge",
   taxType: "taxType",
 };
 
-/** Invoice-style defaults (reuse later) */
 export const BUYER_FIELD_NAMES: CustomerPartyFieldNames = {
   customerId: "customerId",
   name: "buyerName",
@@ -90,21 +81,18 @@ export const BUYER_FIELD_NAMES: CustomerPartyFieldNames = {
   country: "billingCountry",
   placeOfSupply: "placeOfSupply",
   placeOfSupplyCode: "placeOfSupplyCode",
-  reverseCharge: "reverseCharge",
   taxType: "taxType",
 };
 
 type Props = {
   fields?: CustomerPartyFieldNames;
   showPlaceOfSupply?: boolean;
-  showReverseCharge?: boolean;
   title?: string;
 };
 
 export function CustomerPartyFields({
   fields = PROSPECT_FIELD_NAMES,
   showPlaceOfSupply = true,
-  showReverseCharge = true,
   title = "Customer",
 }: Props) {
   const {
@@ -122,12 +110,31 @@ export function CustomerPartyFields({
   const placeOfSupplyCode = f.placeOfSupplyCode
     ? watch(f.placeOfSupplyCode)
     : "";
-  const reverseCharge = f.reverseCharge ? watch(f.reverseCharge) : false;
   const taxType = f.taxType ? watch(f.taxType) : "";
+  const clearCustomerFields = () => {
+    setValue(f.customerId, null, { shouldDirty: true });
+    setValue(f.name, "", { shouldDirty: true, shouldValidate: true });
+    setValue(f.companyName, "", { shouldDirty: true });
+    setValue(f.phone, "", { shouldDirty: true, shouldValidate: true });
+    setValue(f.email, "", { shouldDirty: true });
+    setValue(f.gstin, "", { shouldDirty: true });
+    setValue(f.pan, "", { shouldDirty: true });
+    setValue(f.addressLine1, "", { shouldDirty: true, shouldValidate: true });
+    setValue(f.addressLine2, "", { shouldDirty: true });
+    setValue(f.city, "", { shouldDirty: true, shouldValidate: true });
+    setValue(f.state, "", { shouldDirty: true, shouldValidate: true });
+    setValue(f.stateCode, "", { shouldDirty: true });
+    setValue(f.pincode, "", { shouldDirty: true, shouldValidate: true });
+    setValue(f.country, "India", { shouldDirty: true, shouldValidate: true });
+    if (f.placeOfSupply)
+      setValue(f.placeOfSupply, "", { shouldDirty: true, shouldValidate: true });
+    if (f.placeOfSupplyCode)
+      setValue(f.placeOfSupplyCode, null, { shouldDirty: true });
+  };
 
   const applyCustomer = (customer: SelectedCustomer | null) => {
     if (!customer) {
-      setValue(f.customerId, null, { shouldDirty: true });
+      clearCustomerFields();
       return;
     }
     setValue(f.customerId, customer.id, { shouldDirty: true });
@@ -136,25 +143,47 @@ export function CustomerPartyFields({
       shouldValidate: true,
     });
     setValue(f.companyName, customer.companyName ?? "", { shouldDirty: true });
-    setValue(f.phone, customer.mobile ?? "", { shouldDirty: true });
+    const mob = (customer.mobile || "").replace(/[\s-]/g, "");
+    const phone =
+      mob.startsWith("+") ? mob : mob ? `+91${mob.replace(/^0/, "")}` : "";
+    setValue(f.phone, phone, { shouldDirty: true, shouldValidate: true });
     setValue(f.email, customer.email ?? "", { shouldDirty: true });
     setValue(f.gstin, customer.gstin ?? "", { shouldDirty: true });
     setValue(f.pan, customer.pan ?? "", { shouldDirty: true });
 
     const bill = customer.billingAddress;
     if (!bill) return;
-    setValue(f.addressLine1, bill.addressLine1 ?? "", { shouldDirty: true });
-    setValue(f.addressLine2, bill.addressLine2 ?? "", { shouldDirty: true });
-    setValue(f.city, bill.city ?? "", { shouldDirty: true });
-    setValue(f.state, bill.state ?? "", { shouldDirty: true });
-    setValue(f.stateCode, bill.stateCode ?? (STATE_CODE_MAP[bill.state || ""] || ""), {
+    setValue(f.addressLine1, bill.addressLine1 ?? "", {
       shouldDirty: true,
+      shouldValidate: true,
     });
-    setValue(f.pincode, bill.pincode ?? "", { shouldDirty: true });
-    setValue(f.country, bill.country ?? "India", { shouldDirty: true });
-
+    setValue(f.addressLine2, bill.addressLine2 ?? "", { shouldDirty: true });
+    setValue(f.city, bill.city ?? "", {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+    setValue(f.state, bill.state ?? "", {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+    setValue(
+      f.stateCode,
+      bill.stateCode ?? (STATE_CODE_MAP[bill.state || ""] || ""),
+      { shouldDirty: true },
+    );
+    setValue(f.pincode, bill.pincode ?? "", {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+    setValue(f.country, bill.country ?? "India", {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
     if (f.placeOfSupply && bill.state) {
-      setValue(f.placeOfSupply, bill.state, { shouldDirty: true });
+      setValue(f.placeOfSupply, bill.state, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
       if (f.placeOfSupplyCode) {
         setValue(
           f.placeOfSupplyCode,
@@ -167,59 +196,101 @@ export function CustomerPartyFields({
 
   return (
     <div className="space-y-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-        {title} <span className="text-red-500">*</span>
-      </p>
-
-      <FormField label="Search customer">
-        <CustomerSearchSelect onSelect={applyCustomer} />
-      </FormField>
+      <CustomerSearchSelect onSelect={applyCustomer} hideLabel />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FormField label="Customer name" required error={err(f.name)}>
-          <Input className="h-9" {...register(f.name)} />
+          <Input className="h-9 border-slate-200 bg-white" maxLength={120} {...register(f.name)} />
         </FormField>
-        <FormField label="Company" error={err(f.companyName)}>
-          <Input className="h-9" {...register(f.companyName)} />
+        <FormField label="Company name" error={err(f.companyName)}>
+          <Input className="h-9 border-slate-200 bg-white" maxLength={150} {...register(f.companyName)} />
         </FormField>
-        <FormField label="Phone" error={err(f.phone)}>
-          <Input className="h-9" {...register(f.phone)} />
+
+        <FormField label="Phone" required error={err(f.phone)}>
+          <Input
+            className="h-9 border-slate-200 bg-white"
+            inputMode="tel"
+            maxLength={16}
+            placeholder="+919876543210"
+            value={watch(f.phone) || ""}
+            onChange={(e) => {
+              // Allow + and digits only (country code + number as one string)
+              let v = e.target.value.replace(/[^0-9+]/g, "");
+              if (v.indexOf("+") > 0) v = v.replace(/\+/g, "");
+              if (v.startsWith("+")) {
+                v = "+" + v.slice(1).replace(/\+/g, "");
+              }
+              setValue(f.phone, v.slice(0, 16), {
+                shouldDirty: true,
+                shouldValidate: true,
+              });
+            }}
+          />
         </FormField>
+
         <FormField label="Email" error={err(f.email)}>
-          <Input className="h-9" {...register(f.email)} />
+          <Input
+            className="h-9 border-slate-200 bg-white"
+            type="email"
+            maxLength={100}
+            {...register(f.email)}
+          />
         </FormField>
         <FormField label="GSTIN" error={err(f.gstin)}>
-          <Input className="h-9" {...register(f.gstin)} />
+          <Input className="h-9 border-slate-200 bg-white uppercase" maxLength={15} {...register(f.gstin)} />
         </FormField>
         <FormField label="PAN" error={err(f.pan)}>
-          <Input className="h-9" {...register(f.pan)} />
+          <Input className="h-9 border-slate-200 bg-white uppercase" maxLength={10} {...register(f.pan)} />
         </FormField>
-      </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <FormField label="Address line 1" error={err(f.addressLine1)}>
-          <Input className="h-9" {...register(f.addressLine1)} />
+        <FormField
+          label="Address line 1"
+          required
+          error={err(f.addressLine1)}
+          className="space-y-1 sm:col-span-2"
+        >
+          <Input className="h-9 border-slate-200 bg-white" maxLength={200} {...register(f.addressLine1)} />
         </FormField>
-        <FormField label="Address line 2" error={err(f.addressLine2)}>
-          <Input className="h-9" {...register(f.addressLine2)} />
+        <FormField
+          label="Address line 2"
+          error={err(f.addressLine2)}
+          className="space-y-1 sm:col-span-2"
+        >
+          <Input className="h-9 border-slate-200 bg-white" maxLength={200} {...register(f.addressLine2)} />
         </FormField>
-        <FormField label="City" error={err(f.city)}>
-          <Input className="h-9" {...register(f.city)} />
+
+        <FormField label="City" required error={err(f.city)}>
+          <Input className="h-9 border-slate-200 bg-white" maxLength={80} {...register(f.city)} />
         </FormField>
-        <FormField label="Pincode" error={err(f.pincode)}>
-          <Input className="h-9" {...register(f.pincode)} />
+        <FormField label="Pincode" required error={err(f.pincode)}>
+          <Input
+            className="h-9 border-slate-200 bg-white"
+            inputMode="numeric"
+            maxLength={6}
+            placeholder="6 digits"
+            value={watch(f.pincode) || ""}
+            onChange={(e) =>
+              setValue(f.pincode, e.target.value.replace(/\D/g, "").slice(0, 6), {
+                shouldDirty: true,
+                shouldValidate: true,
+              })
+            }
+          />
         </FormField>
-        <FormField label="State" error={err(f.state)}>
+        <FormField label="State" required error={err(f.state)}>
           <Select
             value={watch(f.state) || ""}
             onValueChange={(value) => {
-              setValue(f.state, value, { shouldDirty: true });
+              setValue(f.state, value, {
+                shouldDirty: true,
+                shouldValidate: true,
+              });
               setValue(f.stateCode, STATE_CODE_MAP[value] || "", {
                 shouldDirty: true,
               });
             }}
           >
-            <SelectTrigger className="h-9">
+            <SelectTrigger className="h-9 border-slate-200 bg-white">
               <SelectValue placeholder="Select state" />
             </SelectTrigger>
             <SelectContent>
@@ -231,65 +302,48 @@ export function CustomerPartyFields({
             </SelectContent>
           </Select>
         </FormField>
-        <FormField label="Country" error={err(f.country)}>
-          <Input className="h-9" placeholder="India" {...register(f.country)} />
+        <FormField label="Country" required error={err(f.country)}>
+          <Input className="h-9 border-slate-200 bg-white" maxLength={60} {...register(f.country)} />
         </FormField>
       </div>
 
-      {(showPlaceOfSupply || showReverseCharge) && f.placeOfSupply ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {showPlaceOfSupply ? (
-            <FormField label="Place of supply" required>
-              <Select
-                value={placeOfSupply || ""}
-                onValueChange={(value) => {
-                  const code = STATE_CODE_MAP[value] || "";
-                  setValue(f.placeOfSupply!, value, { shouldDirty: true });
-                  if (f.placeOfSupplyCode) {
-                    setValue(f.placeOfSupplyCode, code || null, {
-                      shouldDirty: true,
-                    });
-                  }
-                }}
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Select state" />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATES.map((s) => (
-                    <SelectItem key={s.code} value={s.value}>
-                      {s.label} ({s.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="mt-1 text-[11px] text-slate-500">
-                {placeOfSupply
-                  ? `${placeOfSupply}${placeOfSupplyCode ? ` (${placeOfSupplyCode})` : ""} · `
-                  : ""}
-                {taxType === "INTER_STATE" ? "IGST" : "CGST + SGST"}
-              </p>
-            </FormField>
-          ) : null}
-          {showReverseCharge && f.reverseCharge ? (
-            <FormField label="Reverse charge">
-              <Select
-                value={reverseCharge ? "yes" : "no"}
-                onValueChange={(v) =>
-                  setValue(f.reverseCharge!, v === "yes", { shouldDirty: true })
-                }
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="no">No</SelectItem>
-                  <SelectItem value="yes">Yes</SelectItem>
-                </SelectContent>
-              </Select>
-            </FormField>
-          ) : null}
-        </div>
+      {showPlaceOfSupply && f.placeOfSupply ? (
+        <FormField label="Place of supply" required error={err(f.placeOfSupply)}>
+          <Select
+            value={placeOfSupply || ""}
+            onValueChange={(value) => {
+              const code = STATE_CODE_MAP[value] || "";
+              setValue(f.placeOfSupply!, value, {
+                shouldDirty: true,
+                shouldValidate: true,
+              });
+              if (f.placeOfSupplyCode) {
+                setValue(f.placeOfSupplyCode, code || null, {
+                  shouldDirty: true,
+                });
+              }
+            }}
+          >
+            <SelectTrigger className="h-9 border-slate-200 bg-white">
+              <SelectValue placeholder="Select state" />
+            </SelectTrigger>
+            <SelectContent>
+              {STATES.map((s) => (
+                <SelectItem key={s.code} value={s.value}>
+                  {s.label} ({s.code})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="mt-1 text-[11px] text-slate-500">
+            {placeOfSupply
+              ? `${placeOfSupply}${placeOfSupplyCode ? ` (${placeOfSupplyCode})` : ""} · `
+              : ""}
+            {taxType === "INTER_STATE"
+              ? "IGST (inter-state)"
+              : "CGST + SGST (intra-state)"}
+          </p>
+        </FormField>
       ) : null}
     </div>
   );

@@ -37,6 +37,7 @@ export interface BusinessInfo {
   upiId?: string | null;
   branchId?: string | null;
   branchName?: string | null;
+  logo?: string | null;
 }
 
 export interface BusinessContext {

@@ -19,3 +19,14 @@ export { PageHeader } from "./ui/page-header";
 export { FormPageHeader } from "./ui/form-page-header";
 export { StatusBadge } from "./ui/status-badge";
 export { RowActions } from "./ui/row-actions";
+
+export {
+  SalesTable,
+  SalesTableHead,
+  SalesTh,
+  SalesTableFoot,
+  SalesSectionCard,
+  SalesRowAddButton,
+  SalesRowRemoveButton,
+  SalesDiscountToggle,
+} from "./ui/sales-table";

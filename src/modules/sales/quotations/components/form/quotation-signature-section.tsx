@@ -12,7 +12,7 @@ import type { QuotationFormValues } from "../../types/quotation-form.types";
 
 type Mode = "draw" | "upload";
 
-export function QuotationSignatureSection() {
+export function QuotationSignatureSection({ compact = false }: { compact?: boolean }) {
   const { setValue } = useFormContext<QuotationFormValues>();
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -129,7 +129,7 @@ export function QuotationSignatureSection() {
   return (
     <div>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-medium text-slate-700">Signature <span className="text-xs font-normal text-slate-400">(required to finalize)</span></p>
+        <p className="text-sm font-medium text-slate-700">Authorized signatory <span className="text-xs font-normal text-slate-400">(required to finalize)</span></p>
         <div className="flex items-center gap-1.5">
           <Button
             type="button"
@@ -179,8 +179,8 @@ export function QuotationSignatureSection() {
           <canvas
             ref={canvasRef}
             width={640}
-            height={140}
-            className="h-28 w-full touch-none cursor-crosshair sm:h-32"
+            height={compact ? 120 : 160}
+            className={`w-full touch-none cursor-crosshair ${compact ? "h-38 sm:h-40" : "h-32 sm:h-36"}`}
             onMouseDown={startDrawing}
             onMouseMove={draw}
             onMouseUp={endDrawing}
@@ -191,7 +191,7 @@ export function QuotationSignatureSection() {
           />
         </div>
       ) : (
-        <div className="flex h-28 items-center justify-center overflow-hidden rounded-lg border border-dashed border-slate-300 bg-slate-50 sm:h-32">
+        <div className={`flex items-center justify-center overflow-hidden rounded-lg border border-dashed border-slate-300 bg-slate-50 ${compact ? "h-24 sm:h-28" : "h-32 sm:h-36"}`}>
           {preview ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -205,7 +205,7 @@ export function QuotationSignatureSection() {
         </div>
       )}
       <p className="mt-1 text-[11px] text-slate-400">
-        Use draw or upload — only one at a time
+        Use draw or upload
       </p>
     </div>
   );

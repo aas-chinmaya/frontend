@@ -43,6 +43,8 @@ export interface SelectedCustomer {
 
 interface CustomerSearchSelectProps {
   onSelect: (customer: SelectedCustomer | null) => void;
+  /** Hide the built-in label when parent already shows "Customer *" */
+  hideLabel?: boolean;
 }
 
 function clean(value?: string | null) {
@@ -219,6 +221,7 @@ function CustomerDetails({
 
 export default function CustomerSearchSelect({
   onSelect,
+  hideLabel = false,
 }: CustomerSearchSelectProps) {
   const containerRef =
     useRef<HTMLDivElement>(null);
@@ -352,10 +355,11 @@ export default function CustomerSearchSelect({
       ref={containerRef}
       className="relative w-full"
     >
-      <Label className="mb-2 block text-xs font-medium text-slate-600">
-        Customer{" "}
-        <span className="text-red-500">*</span>
-      </Label>
+      {!hideLabel ? (
+        <Label className="mb-2 block text-xs font-medium text-slate-600">
+          Customer <span className="text-red-500">*</span>
+        </Label>
+      ) : null}
 
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-slate-400" />

@@ -35,3 +35,14 @@ export {
   getStateOptions,
   normalizeStateKey,
 } from "./utils";
+
+export {
+  SalesTable,
+  SalesTableHead,
+  SalesTh,
+  SalesTableFoot,
+  SalesSectionCard,
+  SalesRowAddButton,
+  SalesRowRemoveButton,
+  SalesDiscountToggle,
+} from "./components/ui/sales-table";
