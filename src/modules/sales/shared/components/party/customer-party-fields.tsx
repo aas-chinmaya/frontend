@@ -87,14 +87,18 @@ export const BUYER_FIELD_NAMES: CustomerPartyFieldNames = {
 type Props = {
   fields?: CustomerPartyFieldNames;
   showPlaceOfSupply?: boolean;
+  showReverseCharge?: boolean;
   title?: string;
 };
 
 export function CustomerPartyFields({
   fields = PROSPECT_FIELD_NAMES,
   showPlaceOfSupply = true,
+  showReverseCharge = false,
   title = "Customer",
 }: Props) {
+  void title;
+  void showReverseCharge;
   const {
     register,
     setValue,

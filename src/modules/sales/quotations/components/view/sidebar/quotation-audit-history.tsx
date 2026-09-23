@@ -26,7 +26,10 @@ export interface QuotationAuditEntry {
   createdAt: string;
 }
 
-interface QuotationAuditHistoryProps {}
+type QuotationAuditHistoryProps = {
+  quotationId?: string;
+  quotationStatus?: string;
+};
 
 const DUMMY_AUDIT_HISTORY: QuotationAuditEntry[] = [
   {
@@ -125,7 +128,9 @@ function getActionStyle(action: QuotationAuditAction) {
   }
 }
 
-export function QuotationAuditHistory({}: QuotationAuditHistoryProps) {
+export function QuotationAuditHistory({ quotationId, quotationStatus }: QuotationAuditHistoryProps) {
+  void quotationId;
+  void quotationStatus;
   return (
     <div className="space-y-1">
       {DUMMY_AUDIT_HISTORY.map((entry, index) => {

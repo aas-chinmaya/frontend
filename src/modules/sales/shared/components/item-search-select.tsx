@@ -135,11 +135,14 @@ export default function ItemSearchSelect({
   const [open, setOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [debounced, setDebounced] = useState("");
+  const [prevValue, setPrevValue] = useState(value);
 
-  useEffect(() => {
+  // Sync from parent without useEffect setState (lint-safe)
+  if (value !== prevValue) {
+    setPrevValue(value);
     setQuery(value || "");
     if (!value) setSelectedId(null);
-  }, [value]);
+  }
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query), 300);
@@ -242,6 +245,7 @@ export default function ItemSearchSelect({
                 key={item.id}
                 type="button"
                 role="option"
+                aria-selected={selectedId === item.id}
                 onClick={() => selectItem(item)}
                 className="flex w-full items-start gap-2 border-b border-slate-50 px-3 py-2.5 text-left text-sm last:border-0 hover:bg-slate-50"
               >

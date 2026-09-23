@@ -59,7 +59,7 @@ function getDocumentIconClass(
 }
 
 export function QuotationLinkedDocuments({
-  quotationId,
+  quotationId: _quotationId,
 }: QuotationLinkedDocumentsProps) {
   const documents = DUMMY_LINKED_DOCUMENTS;
 

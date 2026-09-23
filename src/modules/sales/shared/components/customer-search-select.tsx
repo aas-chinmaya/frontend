@@ -21,8 +21,12 @@ import type { Customer } from "@/modules/customers/types";
 export interface CustomerAddress {
   addressLine1: string | null;
   addressLine2: string | null;
+  /** Some APIs use line1 / line2 */
+  line1?: string | null;
+  line2?: string | null;
   city: string | null;
   state: string | null;
+  stateCode?: string | null;
   pincode: string | null;
   country: string | null;
 }
@@ -47,15 +51,28 @@ interface CustomerSearchSelectProps {
   hideLabel?: boolean;
 }
 
+
+/** Read optional API fields without unsafe direct casts */
+function asLoose(c: unknown): Record<string, unknown> {
+  return (c && typeof c === "object" ? c : {}) as Record<string, unknown>;
+}
+
+function strField(c: unknown, ...keys: string[]): string {
+  const o = asLoose(c);
+  for (const k of keys) {
+    const v = o[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return "";
+}
+
 function clean(value?: string | null) {
   return value?.trim() || "";
 }
 
 function getCustomerName(customer: Customer) {
   return (
-    clean((customer as any).name) ||
-    clean((customer as any).customerName) ||
-    clean((customer as any).companyName) ||
+    strField(customer, "name", "customerName", "companyName") ||
     String(customer.id)
   );
 }
@@ -64,30 +81,37 @@ function getAddress(
   customer: Customer,
   type: "BILLING" | "SHIPPING",
 ): CustomerAddress | null {
-  const addresses = (customer as any).addresses ?? [];
+  const raw = asLoose(customer).addresses;
+  const addresses = Array.isArray(raw) ? (raw as Array<Record<string, unknown>>) : [];
 
-  const address =
-    addresses.find(
-      (item: any) =>
-        item.type === type && item.isDefault,
-    ) ??
-    addresses.find(
-      (item: any) => item.type === type,
-    );
+  const match =
+    addresses.find((item) => item.type === type && item.isDefault) ??
+    addresses.find((item) => item.type === type);
 
-  if (!address) {
-    return null;
-  }
+  if (!match) return null;
+
+  const line1 =
+    (typeof match.line1 === "string" && match.line1) ||
+    (typeof match.addressLine1 === "string" && match.addressLine1) ||
+    null;
+  const line2 =
+    (typeof match.line2 === "string" && match.line2) ||
+    (typeof match.addressLine2 === "string" && match.addressLine2) ||
+    null;
 
   return {
-    addressLine1: address.addressLine1 ?? null,
-    addressLine2: address.addressLine2 ?? null,
-    city: address.city ?? null,
-    state: address.state ?? null,
-    pincode: address.pincode ?? null,
-    country: address.country ?? null,
+    addressLine1: line1,
+    addressLine2: line2,
+    line1,
+    line2,
+    city: typeof match.city === "string" ? match.city : null,
+    state: typeof match.state === "string" ? match.state : null,
+    stateCode: typeof match.stateCode === "string" ? match.stateCode : null,
+    pincode: typeof match.pincode === "string" ? match.pincode : null,
+    country: typeof match.country === "string" ? match.country : null,
   };
 }
+
 
 function formatAddress(
   address: CustomerAddress | null,
@@ -97,8 +121,8 @@ function formatAddress(
   }
 
   return [
-    address.addressLine1,
-    address.addressLine2,
+    (address.line1 ?? (address as { addressLine1?: string }).addressLine1),
+    (address.line2 ?? (address as { addressLine2?: string }).addressLine2),
     address.city,
     address.state,
     address.pincode,
@@ -110,7 +134,7 @@ function formatAddress(
 }
 
 function getCompanyName(customer: Customer) {
-  return clean((customer as any).companyName);
+  return strField(customer, "companyName");
 }
 
 function getPersonName(customer: Customer) {
@@ -128,10 +152,10 @@ function getContactLine(
   customer: Customer | SelectedCustomer,
 ) {
   return [
-    clean((customer as any).gstin),
-    clean((customer as any).pan),
-    clean((customer as any).mobile),
-    clean((customer as any).email),
+    strField(customer, "gstin"),
+    strField(customer, "pan"),
+    strField(customer, "mobile"),
+    strField(customer, "email"),
   ]
     .filter(Boolean)
     .join(" | ");
@@ -141,7 +165,7 @@ function getDisplayName(
   customer: Customer | SelectedCustomer,
 ) {
   return (
-    clean((customer as any).companyName) ||
+    strField(customer, "companyName") ||
     getCustomerName(customer as Customer)
   );
 }
@@ -274,22 +298,13 @@ export default function CustomerSearchSelect({
 
     return list.filter((customer) => {
       const values = [
-        (customer as any).name,
-        (customer as any).customerName,
-        (customer as any).companyName,
-        (customer as any).mobile,
-        (customer as any).email,
-        (customer as any).gstin,
-        (customer as any).pan,
+        strField(customer, "name", "customerName", "companyName"),
+        strField(customer, "mobile", "phone"),
+        strField(customer, "email"),
+        strField(customer, "gstin"),
+        strField(customer, "pan"),
       ];
-
-      return values
-        .filter(Boolean)
-        .some((value) =>
-          String(value)
-            .toLowerCase()
-            .includes(search),
-        );
+      return values.some((value) => value.toLowerCase().includes(search));
     });
   }, [query, customers, selectedCustomer]);
 
@@ -299,31 +314,26 @@ export default function CustomerSearchSelect({
     const selected: SelectedCustomer = {
       id: String(customer.id),
 
-      tenantId: String(
-        (customer as any).tenantId ?? (customer as any).businessId ?? "",
-      ),
-
-      branchId: String(
-        (customer as any).branchId ?? "",
-      ),
+      tenantId: strField(customer, "tenantId", "businessId"),
+      branchId: strField(customer, "branchId"),
 
       name: getCustomerName(customer),
 
       companyName:
-        clean((customer as any).companyName) ||
+        strField(customer, "companyName") ||
         null,
 
       mobile:
-        clean((customer as any).mobile) || null,
+        strField(customer, "mobile") || null,
 
       email:
-        clean((customer as any).email) || null,
+        strField(customer, "email") || null,
 
       gstin:
-        clean((customer as any).gstin) || null,
+        strField(customer, "gstin") || null,
 
       pan:
-        clean((customer as any).pan) || null,
+        strField(customer, "pan") || null,
 
       billingAddress: getAddress(
         customer,

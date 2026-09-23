@@ -14,6 +14,7 @@ const STATUS_BADGE: Record<
   QuotationStatus,
   { className: string; label: string }
 > = {
+  FINALIZED: { className: "bg-indigo-100 text-indigo-800", label: "Finalized" },
   DRAFT: { className: "bg-[var(--neutral)]", label: "Draft" },
   SENT: { className: "bg-[var(--info)]", label: "Sent" },
   ACCEPTED: { className: "bg-[var(--success)]", label: "Accepted" },

@@ -146,11 +146,11 @@ export function QuotationFormActions({
           )}
         </div>
       </div>
-      {/* {!readOnly && hint ? (
+      {!readOnly && hint ? (
         <p className="mt-2 text-center text-[11px] text-slate-500 sm:text-right">
           {hint}
         </p>
-      ) : null} */}
+      ) : null}
     </div>
   );
 }

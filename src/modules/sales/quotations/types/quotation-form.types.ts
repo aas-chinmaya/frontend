@@ -1,5 +1,6 @@
+import type { z } from "zod";
 import type { Quotation } from "./quotation.types";
-import type { QuotationCreateSchema } from "../schemas/quotation.schema";
+import { quotationCreateSchema } from "../schemas/quotation.schema";
 
 export type QuotationFormMode = "create" | "edit";
 
@@ -10,4 +11,4 @@ export interface QuotationFormProps {
   onCancel?: () => void;
 }
 
-export type QuotationFormValues = QuotationCreateSchema;
+export type QuotationFormValues = z.infer<typeof quotationCreateSchema>;

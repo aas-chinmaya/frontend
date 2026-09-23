@@ -367,18 +367,18 @@ showUPIDetails: false,
     prospectCompanyName: null,
     prospectGSTIN: null,
     prospectPAN: null,
-    prospectPhone: null,
+    prospectPhone: "",
     prospectEmail: null,
-    prospectAddressLine1: null,
+    prospectAddressLine1: "",
     prospectAddressLine2: null,
-    prospectCity: null,
-    prospectState: null,
+    prospectCity: "",
+    prospectState: "",
     prospectStateCode: null,
-    prospectPincode: null,
+    prospectPincode: "",
     prospectCountry: "India",
 
     customerId: null,
-    placeOfSupply: null,
+    placeOfSupply: "",
     placeOfSupplyCode: null,
     taxType: "INTRA_STATE",
     reverseCharge: false,
@@ -401,9 +401,9 @@ showUPIDetails: false,
     grandTotal: 0,
 
     notes: null,
-    termsAndConditions: null,
+    termsAndConditions: "",
     signature: undefined,
-  };
+  } as QuotationFormValues;
 }
 
 export function mapQuotationToFormValues(
@@ -419,7 +419,7 @@ export function mapQuotationToFormValues(
     validUntil: q.validUntil?.slice(0, 10) ?? "",
     financialYear: resolveFinancialYear(q.quotationDate),
 
-    businessName: q.businessName,
+    businessName: q.businessName ?? "",
     businessLegalName: q.businessLegalName ?? null,
     businessGSTIN: q.businessGSTIN ?? null,
     businessPAN: q.businessPAN ?? null,
@@ -442,22 +442,22 @@ businessUPIId: q.businessUPIId ?? null,
 showBankDetails: q.showBankDetails ?? false,
 showUPIDetails: q.showUPIDetails ?? false,
 
-    prospectName: q.prospectName,
+    prospectName: q.prospectName ?? "",
     prospectCompanyName: q.prospectCompanyName ?? null,
     prospectGSTIN: q.prospectGSTIN ?? null,
     prospectPAN: q.prospectPAN ?? null,
-    prospectPhone: q.prospectPhone ?? null,
+    prospectPhone: q.prospectPhone ?? "",
     prospectEmail: q.prospectEmail ?? null,
-    prospectAddressLine1: q.prospectAddressLine1 ?? null,
+    prospectAddressLine1: q.prospectAddressLine1 ?? "",
     prospectAddressLine2: q.prospectAddressLine2 ?? null,
-    prospectCity: q.prospectCity ?? null,
-    prospectState: q.prospectState ?? null,
+    prospectCity: q.prospectCity ?? "",
+    prospectState: q.prospectState ?? "",
     prospectStateCode: q.prospectStateCode ?? null,
-    prospectPincode: q.prospectPincode ?? null,
+    prospectPincode: q.prospectPincode ?? "",
     prospectCountry: q.prospectCountry ?? "India",
 
     customerId: q.customerId ?? null,
-    placeOfSupply: q.placeOfSupply ?? null,
+    placeOfSupply: q.placeOfSupply ?? "",
     placeOfSupplyCode: q.placeOfSupplyCode ?? null,
     taxType: q.taxType ?? "INTRA_STATE",
     reverseCharge: q.reverseCharge ?? false,
@@ -509,9 +509,9 @@ showUPIDetails: q.showUPIDetails ?? false,
     grandTotal: q.grandTotal ?? 0,
 
     notes: q.notes ?? null,
-    termsAndConditions: q.termsAndConditions ?? null,
+    termsAndConditions: q.termsAndConditions ?? "",
     signature: q.signature ?? null,
-  };
+  } as QuotationFormValues;
 }
 
 export function getSessionFormDefaults(session: {
@@ -573,7 +573,7 @@ businessUPIId: business?.upiId ?? null,
 
 showBankDetails: false,
 showUPIDetails: false,
-    businessLogo: (business as any)?.logo ?? null,
+    businessLogo: (business as { logo?: string | null } | null | undefined)?.logo ?? null,
   };
 }
 
@@ -796,7 +796,7 @@ return {
     return t || null;
   })(),
   signature: rest.signature || null,
-  status: (rest as { status?: string }).status || "DRAFT",
+  status: (rest.status as import("../types/quotation.types").QuotationStatus | undefined) ?? "DRAFT",
 };
 }
 

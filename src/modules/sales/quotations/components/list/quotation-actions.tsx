@@ -45,9 +45,10 @@ export default function QuotationActions({
       const res = await deleteQuotation(id).unwrap();
       notify.success(res.message || "Quotation deleted successfully");
       setOpen(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const e = err as { data?: { message?: string }; message?: string };
       notify.error(
-        err?.data?.message || err?.message || "Failed to delete quotation",
+        e?.data?.message || e?.message || "Failed to delete quotation",
       );
     }
   };

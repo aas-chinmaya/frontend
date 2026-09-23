@@ -180,7 +180,7 @@ export function QuotationSignatureSection({ compact = false }: { compact?: boole
             ref={canvasRef}
             width={640}
             height={compact ? 120 : 160}
-            className={`w-full touch-none cursor-crosshair ${compact ? "h-38 sm:h-40" : "h-32 sm:h-36"}`}
+            className={`w-full touch-none cursor-crosshair ${compact ? "h-24 sm:h-28" : "h-32 sm:h-36"}`}
             onMouseDown={startDrawing}
             onMouseMove={draw}
             onMouseUp={endDrawing}
@@ -205,7 +205,7 @@ export function QuotationSignatureSection({ compact = false }: { compact?: boole
         </div>
       )}
       <p className="mt-1 text-[11px] text-slate-400">
-        Use draw or upload
+        Use draw or upload — only one at a time
       </p>
     </div>
   );

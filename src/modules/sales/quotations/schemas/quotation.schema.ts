@@ -96,16 +96,6 @@ const pincodeSchema = z
   .nullable();
 
 
-const optionalString = z
-  .union([z.string(), z.literal(""), z.null()])
-  .optional()
-  .transform((v) => {
-    if (v === "" || v === undefined || v === null) return null;
-    return stripControl(String(v));
-  })
-  .superRefine((v, ctx) => {
-    if (typeof v === "string") noHarmful(v, ctx);
-  });
 
 const safeText = (max: number, requiredMsg?: string) => {
   let s = z.string().max(max, `Max ${max} characters`);
@@ -131,7 +121,7 @@ const optionalSafeText = (max: number) =>
 
 const money = (label: string, max = LIMITS.MAX_PRICE) =>
   z.coerce
-    .number({ invalid_type_error: `${label} must be a number` })
+    .number()
     .nonnegative(`${label} cannot be negative`)
     .max(max, `${label} exceeds allowed limit`);
 

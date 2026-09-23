@@ -1,14 +1,8 @@
-
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  PanelRightClose,
-  PanelRightOpen,
-  X,
-} from "lucide-react";
+import { PanelRightClose, X } from "lucide-react";
 
 import { notify } from "@/lib/toast";
 import {
@@ -29,9 +23,6 @@ export function QuotationView({ id }: QuotationViewProps) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Keep last successful quotation so refetch never blanks the page
-  const stableQuotation = useRef<Quotation | null>(null);
-
   const {
     data: response,
     isLoading,
@@ -44,22 +35,12 @@ export function QuotationView({ id }: QuotationViewProps) {
   const [downloadPdf, { isLoading: pdfLoading }] =
     useDownloadQuotationPdfMutation();
 
-  const loading = isLoading || isFetching;
+  const quotation = response?.data ?? null;
+  const loading = isLoading || (isFetching && !quotation);
   const error = queryError
     ? (queryError as { data?: { message?: string } })?.data?.message ||
       "Failed to fetch quotation"
     : null;
-
-  if (response?.data) {
-    stableQuotation.current = response.data;
-  }
-
-  const quotation = stableQuotation.current;
-
-  useEffect(() => {
-    const mql = window.matchMedia("(min-width: 1024px)");
-    setSidebarOpen(mql.matches);
-  }, []);
 
   useEffect(() => {
     if (error && !quotation) {
@@ -87,20 +68,14 @@ export function QuotationView({ id }: QuotationViewProps) {
   };
 
   const handleStatusChange = async (
-    status:
-      | "ACCEPTED"
-      | "REJECTED"
-      | "CANCELLED"
-      | "SENT"
-      | "FINALIZED"
-      | "DRAFT",
-    remarks?: string,
+    status: "ACCEPTED" | "REJECTED",
+    statusNote: string,
   ) => {
     if (!quotation?.id) return;
     try {
       const res = await updateStatus({
         id: quotation.id,
-        data: { status, remarks },
+        data: { status, remarks: statusNote },
       }).unwrap();
       notify.success(res.message || `Status updated to ${status}`);
     } catch (err: unknown) {
@@ -111,7 +86,6 @@ export function QuotationView({ id }: QuotationViewProps) {
     }
   };
 
-  // Initial load only
   if (loading && !quotation) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-gray-50">
@@ -140,8 +114,7 @@ export function QuotationView({ id }: QuotationViewProps) {
 
   return (
     <div className="relative flex min-h-screen w-full overflow-hidden rounded-lg">
-      {/* LEFT — main content */}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col ">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <QuotationViewHeader
           quotation={quotation}
           onOpenSidebar={() => setSidebarOpen(true)}
@@ -150,87 +123,51 @@ export function QuotationView({ id }: QuotationViewProps) {
           onDownload={handleDownload}
           downloadLoading={pdfLoading}
         />
-
-        <main className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-auto bg-slate-50 p-3 sm:p-4">
           <QuotationPreview quotation={quotation} />
-        </main>
-      </div>
-
-      {/* DESKTOP RIGHT SIDEBAR — collapsible, does not use full-page overlay */}
-      <div
-        className={`relative hidden min-h-full shrink-0 flex-col border-l border-gray-200 bg-white transition-all duration-300 ease-in-out lg:flex ${
-          sidebarOpen ? "w-[280px] xl:w-[300px]" : "w-12"
-        }`}
-      >
-        <div className="flex h-14 shrink-0 items-center justify-between border-b border-gray-100 px-3">
-          {sidebarOpen && (
-            <div className="min-w-0 pl-1">
-              <h2 className="truncate text-sm font-semibold text-gray-900">
-                Activity
-              </h2>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="ml-auto flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-gray-800"
-            title={sidebarOpen ? "Collapse" : "Expand"}
-          >
-            <PanelRightClose
-              className={`h-4 w-4 transition-transform duration-300 ease-in-out ${
-                sidebarOpen ? "rotate-0" : "rotate-180"
-              }`}
-            />
-          </button>
         </div>
-
-        {sidebarOpen ? (
-          <div className="flex-1 overflow-hidden">
-            <QuotationSidebar quotation={quotation} />
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(true)}
-            className="flex flex-1 flex-col items-center justify-center gap-3 py-4 text-gray-400 transition hover:text-gray-600"
-          >
-            <span className="rotate-180 text-xs font-medium tracking-wide [writing-mode:vertical-rl]">
-              Activity
-            </span>
-          </button>
-        )}
       </div>
 
-      {/* MOBILE: backdrop */}
-      {sidebarOpen && (
-        <div
-          className="absolute inset-0 z-40 cursor-pointer bg-black/30 transition-opacity duration-300 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-          aria-hidden
-        />
-      )}
+      {/* Desktop sidebar */}
+      <aside className="hidden w-80 shrink-0 border-l border-slate-200 bg-white lg:block">
+        <QuotationSidebar quotation={quotation} />
+      </aside>
 
-      {/* MOBILE: drawer overlay */}
-      <div
-        className={`absolute inset-y-0 right-0 z-50 flex w-[300px] flex-col bg-white shadow-xl transition-transform duration-300 ease-in-out sm:w-[340px] lg:hidden ${
-          sidebarOpen ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
-        <div className="flex h-12 shrink-0 items-center justify-between border-b border-gray-100 px-4">
-          <h2 className="text-sm font-semibold text-gray-900">Activity</h2>
+      {/* Mobile sidebar drawer */}
+      {sidebarOpen ? (
+        <div className="fixed inset-0 z-40 lg:hidden">
           <button
             type="button"
+            className="absolute inset-0 bg-black/40"
+            aria-label="Close sidebar"
             onClick={() => setSidebarOpen(false)}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-gray-800"
-            title="Close"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          />
+          <div className="absolute right-0 top-0 flex h-full w-[min(100%,20rem)] flex-col bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
+              <span className="text-sm font-medium text-slate-700">Details</span>
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(false)}
+                className="rounded p-1 text-slate-500 hover:bg-slate-100"
+                aria-label="Close"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-auto">
+              <QuotationSidebar quotation={quotation} />
+            </div>
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(false)}
+              className="flex items-center justify-center gap-2 border-t border-slate-100 py-2 text-sm text-slate-600"
+            >
+              <PanelRightClose className="size-4" />
+              Close
+            </button>
+          </div>
         </div>
-        <div className="flex-1 overflow-hidden">
-          <QuotationSidebar quotation={quotation} />
-        </div>
-      </div>
+      ) : null}
     </div>
   );
 }

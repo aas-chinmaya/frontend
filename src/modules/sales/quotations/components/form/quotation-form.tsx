@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { useForm, FormProvider, useWatch } from "react-hook-form";
+import { useForm, FormProvider, useWatch, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { notify } from "@/lib/toast";
 
@@ -82,7 +82,7 @@ export function QuotationForm({
   );
 
   const form = useForm<QuotationFormValues>({
-    resolver: zodResolver(quotationCreateSchema),
+    resolver: zodResolver(quotationCreateSchema) as unknown as Resolver<QuotationFormValues>,
     defaultValues:
       mode === "edit" && quotation
         ? mapQuotationToFormValues(
@@ -191,7 +191,9 @@ export function QuotationForm({
   }, [mode, session?.business?.id, session?.user?.id]);
 
 
-  const firstErrorMessage = (errs: Record<string, any>): string => {
+  const firstErrorMessage = (
+    errs: Record<string, unknown>,
+  ): string => {
     const labels: Record<string, string> = {
       prospectName: "Customer name",
       prospectPhone: "Customer phone",
@@ -210,21 +212,24 @@ export function QuotationForm({
       businessName: "Business name",
     };
 
-    const walk = (obj: any, path: string[] = []): string | null => {
+    const walk = (
+      obj: unknown,
+      path: string[] = [],
+    ): string | null => {
       if (!obj || typeof obj !== "object") return null;
-      if (typeof obj.message === "string" && obj.message) {
+      const rec = obj as Record<string, unknown>;
+      if (typeof rec.message === "string" && rec.message) {
         const key = path[0] || "";
         const label = labels[key] || key || "Field";
-        const msg = obj.message;
-        // Prefer "Label: message" when message is generic
+        const msg = rec.message;
         if (msg.toLowerCase().includes("required") || msg.length < 40) {
           return `${label}: ${msg}`;
         }
         return msg;
       }
-      for (const k of Object.keys(obj)) {
+      for (const k of Object.keys(rec)) {
         if (k === "ref" || k === "type" || k === "types") continue;
-        const found = walk(obj[k], path.concat(k));
+        const found = walk(rec[k], path.concat(k));
         if (found) return found;
       }
       return null;
@@ -237,13 +242,14 @@ export function QuotationForm({
     const values = form.getValues();
     const valid = await form.trigger();
     if (!valid) {
-      let msg = firstErrorMessage(form.formState.errors as Record<string, any>);
+      let msg = firstErrorMessage(form.formState.errors as Record<string, unknown>);
       // Fallback: parse values so toast always names the missing field
       if (msg === "Please fix the highlighted fields") {
         try {
           quotationCreateSchema.parse(form.getValues());
-        } catch (e: any) {
-          const issue = e?.issues?.[0] || e?.errors?.[0];
+        } catch (e: unknown) {
+          const ze = e as { issues?: Array<{ message?: string; path?: unknown[] }>; errors?: Array<{ message?: string; path?: unknown[] }> };
+          const issue = ze?.issues?.[0] || ze?.errors?.[0];
           if (issue?.message) {
             const path = Array.isArray(issue.path) ? issue.path[0] : "";
             const labels: Record<string, string> = {
@@ -287,7 +293,7 @@ export function QuotationForm({
       if (mode === "create") {
         // Never send tenantId / branchId / createdBy — backend uses auth
         const payload = sanitizeCreatePayload(withStatus);
-        const res = await createQuotation(payload as any).unwrap();
+        const res = await createQuotation(payload).unwrap();
         notify.success(
           res.message ||
             (status === "FINALIZED" ? "Quotation finalized" : "Draft saved"),
@@ -301,7 +307,7 @@ export function QuotationForm({
         const payload = sanitizeUpdatePayload(withStatus);
         const res = await updateQuotation({
           id: quotation.id,
-          data: { ...payload, status } as any,
+          data: { ...payload, status },
         }).unwrap();
         notify.success(
           res.message ||
@@ -309,12 +315,17 @@ export function QuotationForm({
         );
         onSuccess?.(res.data);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const e = err as {
+        data?: { message?: string } | string;
+        error?: string;
+        message?: string;
+      };
       const apiMessage =
-        err?.data?.message ||
-        err?.error ||
-        (typeof err?.data === "string" ? err.data : null) ||
-        err?.message ||
+        (typeof e?.data === "object" && e?.data?.message) ||
+        e?.error ||
+        (typeof e?.data === "string" ? e.data : null) ||
+        e?.message ||
         "Something went wrong";
       notify.error(
         typeof apiMessage === "string"
