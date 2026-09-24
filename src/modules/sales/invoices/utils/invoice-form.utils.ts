@@ -316,17 +316,16 @@ export function applyTotalsToValues(
   };
 }
 
-/** Strip auth fields — backend sets tenantId / createdBy / businessId / branchId */
 export function sanitizeCreatePayload(values: InvoiceFormValues) {
   const {
     // never send
-    // @ts-expect-error strip if present
+
     tenantId: _t,
-    // @ts-expect-error strip
+   
     createdBy: _c,
-    // @ts-expect-error strip
+  
     businessId: _b,
-    // @ts-expect-error strip
+    
     branchId: _br,
     ...rest
   } = values as InvoiceFormValues & Record<string, unknown>;

@@ -2,10 +2,7 @@
 
 import { useMemo } from "react";
 
-/**
- * Business + user context for sales UI defaults only.
- * Never put tenantId / branchId / createdBy on API bodies — backend uses auth.
- */
+
 
 export interface BusinessUser {
   id: string;
@@ -76,7 +73,7 @@ const DUMMY: BusinessContext = {
     upiId: "aasinternational@upi",
     branchId: "AASI-BR-001",
     branchName: "Bhubaneswar Head Office",
-    logo: null,
+    logo: "https://www.aasint.com/assets/aaslogo.png",
   },
 };
 

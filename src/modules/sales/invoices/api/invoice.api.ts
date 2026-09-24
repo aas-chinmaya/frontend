@@ -106,13 +106,9 @@ export const invoiceApi = baseApi.injectEndpoints({
       InvoiceListResponse,
       InvoiceListParams | undefined
     >({
-      // query: (params) => ({
-      //    url: `${INVOICE_ENDPOINT}/list/`,
-      //   method: "GET",
-      //   params,
-      // }),
+   
       query: (params) => ({
-        url: `${INVOICE_ENDPOINT}/list/`,
+        url: `${INVOICE_ENDPOINT}/invoices`,
         method: "GET",
         params,
       }),
@@ -139,7 +135,7 @@ export const invoiceApi = baseApi.injectEndpoints({
 
     getInvoiceById: builder.query<InvoiceResponse, string>({
       query: (id) => ({
-        url: `${INVOICE_ENDPOINT}/${id}`,
+        url: `${INVOICE_ENDPOINT}/invoices/${id}`,
         method: "GET",
       }),
       transformResponse: (response: unknown) => unwrapOne(response),
@@ -156,7 +152,7 @@ export const invoiceApi = baseApi.injectEndpoints({
       InvoiceCreatePayload
     >({
       query: (data) => ({
-         url: `${INVOICE_ENDPOINT}/create`,
+         url: `${INVOICE_ENDPOINT}/`,
         method: "POST",
         data,
       }),
