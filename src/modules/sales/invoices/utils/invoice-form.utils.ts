@@ -1,33 +1,448 @@
 
-/** Keep amounts within production limits before API */
-function clampMoney(n: number, max = 10_00_00_000) {
-  const v = toNum(n);
-  if (v < 0) return 0;
-  if (v > max) return max;
-  return round2(v);
+import type { Invoice } from "../types/invoice.types";
+import type { InvoiceFormValues, InvoiceItemFormValues } from "../types/invoice-form.types";
+import type { TaxType } from "../types/invoice.types";
+
+export function formatINR(value: number) {
+  return `₹${Number(value || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
-function clampQty(n: number) {
-  const v = toNum(n);
-  if (v < 0) return 0;
-  if (v > 1_00_000) return 1_00_000;
-  return v;
+export function amountInWords(amount: number): string {
+  // thin wrapper — prefer shared if available
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { amountInWords: aw } = require("@/modules/sales/shared/utils/amount-in-words");
+    return aw(amount);
+  } catch {
+    return "";
+  }
 }
 
-import type {
-  Invoice,
-  InvoiceCreatePayload,
-  InvoiceUpdatePayload,
-  TaxType,
-  DiscountType,
-  InvoiceItem,
-} from "../types/invoice.types";
-import type { InvoiceFormValues } from "../types/invoice-form.types";
-import { getStateCode } from "@/modules/sales/shared/utils/state-code";
-
-function round2(n: number) {
-  return Math.round((n + Number.EPSILON) * 100) / 100;
+function num(v: unknown) {
+  return Number(v) || 0;
 }
+
+export function resolveTaxType(
+  sellerStateCode?: string | null,
+  placeOfSupplyCode?: string | null,
+): TaxType {
+  if (!sellerStateCode || !placeOfSupplyCode) return "INTRA_STATE";
+  return String(sellerStateCode) === String(placeOfSupplyCode)
+    ? "INTRA_STATE"
+    : "INTER_STATE";
+}
+
+export function resolveFinancialYear(dateStr?: string | null) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = d.getMonth() + 1;
+  // Indian FY Apr–Mar
+  return m >= 4 ? `${y}-${String(y + 1).slice(-2)}` : `${y - 1}-${String(y).slice(-2)}`;
+}
+
+export function emptyLineItem(): InvoiceItemFormValues {
+  return {
+    itemId: null,
+    itemName: "",
+    productName: "",
+    description: "",
+    hsnSac: "",
+    quantity: 1,
+    unit: "PCS",
+    rate: 0,
+    price: 0,
+    discountType: "PERCENTAGE",
+    discountValue: 0,
+    discount: 0,
+    taxRate: 18,
+    taxAmount: 0,
+    cgstRate: 9,
+    cgstAmount: 0,
+    sgstRate: 9,
+    sgstAmount: 0,
+    igstRate: 0,
+    igstAmount: 0,
+    amount: 0,
+    total: 0,
+    stockAvailable: null,
+  };
+}
+
+export function getDefaultInvoiceValues(
+  _businessId = "",
+  _userId = "",
+): InvoiceFormValues {
+  return {
+    invoiceType: "B2B",
+    invoiceDate: new Date().toISOString().slice(0, 10),
+    financialYear: resolveFinancialYear(new Date().toISOString()),
+    buyerName: "",
+    buyerCompanyName: "",
+    buyerPhone: "",
+    buyerEmail: null,
+    buyerGSTIN: "",
+    buyerPAN: "",
+    billingAddressLine1: "",
+    billingAddressLine2: "",
+    billingCity: "",
+    billingState: "",
+    billingStateCode: "",
+    billingPincode: "",
+    billingCountry: "India",
+    sameAsBilling: true,
+    placeOfSupply: "",
+    placeOfSupplyCode: "",
+    taxType: "INTRA_STATE",
+    reverseCharge: false,
+    isExport: false,
+    isSEZ: false,
+    currency: "INR",
+    items: [emptyLineItem()],
+    totalItems: 0,
+    totalQuantity: 0,
+    taxableAmount: 0,
+    discountAmount: 0,
+    cgstAmount: 0,
+    sgstAmount: 0,
+    igstAmount: 0,
+    cessAmount: 0,
+    roundOffAmount: 0,
+    grandTotal: 0,
+    paymentStatus: "PENDING",
+    paymentMethod: "Cash",
+    paidAmount: 0,
+    paymentDate: null,
+    transactionId: null,
+    notes: "",
+    termsAndConditions: "",
+    signature: null,
+    showBankDetails: false,
+    showUPIDetails: false,
+    status: "DRAFT",
+  };
+}
+
+/** Map session business → seller fields (never send tenant/createdBy) */
+export function getSessionFormDefaults(session: {
+  business?: Record<string, unknown> | null;
+  user?: Record<string, unknown> | null;
+} | null | undefined): Partial<InvoiceFormValues> {
+  const b = (session?.business || {}) as Record<string, unknown>;
+  return {
+    sellerTradeName: String(b.name || b.tradeName || ""),
+    sellerLegalName: String(b.legalName || b.name || ""),
+    sellerGSTIN: String(b.gstin || b.GSTIN || ""),
+    sellerPAN: String(b.pan || b.PAN || ""),
+    sellerPhone: String(b.phone || ""),
+    sellerEmail: (b.email as string) || null,
+    sellerAddressLine1: String(b.addressLine1 || b.address || ""),
+    sellerAddressLine2: String(b.addressLine2 || ""),
+    sellerCity: String(b.city || ""),
+    sellerState: String(b.state || ""),
+    sellerStateCode: String(b.stateCode || ""),
+    sellerPincode: String(b.pincode || ""),
+    sellerCountry: String(b.country || "India"),
+    sellerBankName: String(b.bankName || ""),
+    sellerBankAccountNumber: String(b.bankAccountNumber || b.accountNumber || ""),
+    sellerBankIFSC: String(b.bankIFSC || b.ifsc || ""),
+    sellerBankBranch: String(b.bankBranch || ""),
+    sellerUPIId: String(b.upiId || b.upi || ""),
+    businessLogo: (b.logo as string) || (b.businessLogo as string) || null,
+  };
+}
+
+export function mapInvoiceToFormValues(
+  inv: Invoice,
+  _businessId?: string,
+  _userId?: string,
+): InvoiceFormValues {
+  return {
+    ...getDefaultInvoiceValues(),
+    invoiceType: inv.invoiceType || "B2B",
+    invoiceDate: inv.invoiceDate?.slice(0, 10) || "",
+    financialYear: inv.financialYear || "",
+    buyerName: inv.buyerName || "",
+    buyerCompanyName: inv.buyerCompanyName || "",
+    buyerPhone: inv.buyerPhone || "",
+    buyerEmail: inv.buyerEmail || null,
+    buyerGSTIN: inv.buyerGSTIN || "",
+    buyerPAN: inv.buyerPAN || "",
+    billingAddressLine1: inv.billingAddressLine1 || "",
+    billingAddressLine2: inv.billingAddressLine2 || "",
+    billingCity: inv.billingCity || "",
+    billingState: inv.billingState || "",
+    billingStateCode: inv.billingStateCode || "",
+    billingPincode: inv.billingPincode || "",
+    billingCountry: inv.billingCountry || "India",
+    sameAsBilling: inv.sameAsBilling ?? true,
+    shippingAddressLine1: inv.shippingAddressLine1 || "",
+    shippingAddressLine2: inv.shippingAddressLine2 || "",
+    shippingCity: inv.shippingCity || "",
+    shippingState: inv.shippingState || "",
+    shippingStateCode: inv.shippingStateCode || "",
+    shippingPincode: inv.shippingPincode || "",
+    shippingCountry: inv.shippingCountry || "",
+    placeOfSupply: inv.placeOfSupply || "",
+    placeOfSupplyCode: inv.placeOfSupplyCode || "",
+    taxType: inv.taxType || "INTRA_STATE",
+    reverseCharge: inv.reverseCharge ?? false,
+    isExport: inv.isExport ?? false,
+    isSEZ: inv.isSEZ ?? false,
+    currency: inv.currency || "INR",
+    items: (inv.items || []).map((it) => ({
+      id: it.id,
+      itemId: it.itemId,
+      productId: it.productId || "",
+      itemName: it.itemName || it.productName || "",
+      productName: it.productName || it.itemName || "",
+      quantity: num(it.quantity),
+      rate: num(it.rate ?? it.price),
+      price: num(it.price ?? it.rate),
+      discountType: it.discountType || "PERCENTAGE",
+      discountValue: num(it.discountValue ?? it.discount),
+      discount: num(it.discount ?? it.discountValue),
+      taxRate: num(it.taxRate ?? it.gstRate),
+      taxAmount: num(it.taxAmount),
+      total: num(it.total ?? it.amount),
+      amount: num(it.amount ?? it.total),
+      unit: it.unit || "",
+      hsnSac: it.hsnSac || it.hsnSacCode || "",
+      description: it.description || "",
+    })),
+    taxableAmount: num(inv.taxableAmount),
+    discountAmount: num(inv.discountAmount),
+    cgstAmount: num(inv.cgstAmount),
+    sgstAmount: num(inv.sgstAmount),
+    igstAmount: num(inv.igstAmount),
+    cessAmount: num(inv.cessAmount),
+    roundOffAmount: num(inv.roundOffAmount),
+    grandTotal: num(inv.grandTotal),
+    paymentStatus: inv.paymentStatus || "PENDING",
+    paymentMethod: inv.paymentMethod || "Cash",
+    paidAmount: num(inv.paidAmount),
+    paymentDate: inv.paymentDate || null,
+    transactionId: inv.transactionId || null,
+    notes: inv.notes || "",
+    termsAndConditions: inv.termsAndConditions || "",
+    signature: inv.signature || null,
+    sellerTradeName: inv.sellerTradeName || "",
+    sellerLegalName: inv.sellerLegalName || "",
+    sellerGSTIN: inv.sellerGSTIN || "",
+    sellerPAN: inv.sellerPAN || "",
+    sellerPhone: inv.sellerPhone || "",
+    sellerEmail: inv.sellerEmail || null,
+    sellerAddressLine1: inv.sellerAddressLine1 || "",
+    sellerAddressLine2: inv.sellerAddressLine2 || "",
+    sellerCity: inv.sellerCity || "",
+    sellerState: inv.sellerState || "",
+    sellerStateCode: inv.sellerStateCode || "",
+    sellerPincode: inv.sellerPincode || "",
+    sellerCountry: inv.sellerCountry || "India",
+    sellerBankName: inv.sellerBankName || "",
+    sellerBankAccountNumber: inv.sellerBankAccountNumber || "",
+    sellerBankIFSC: inv.sellerBankIFSC || "",
+    sellerBankBranch: inv.sellerBankBranch || "",
+    sellerUPIId: inv.sellerUPIId || "",
+    showBankDetails: inv.showBankDetails ?? false,
+    showUPIDetails: inv.showUPIDetails ?? false,
+    businessLogo: (inv as { businessLogo?: string | null }).businessLogo || null,
+  };
+}
+
+function lineTotals(item: InvoiceItemFormValues, taxType: TaxType) {
+  const qty = num(item.quantity);
+  const rate = num(item.rate ?? item.price);
+  const discVal = num(item.discountValue ?? item.discount);
+  const dtype = item.discountType || "PERCENTAGE";
+  let taxable = qty * rate;
+  if (dtype === "PERCENTAGE") taxable -= (taxable * discVal) / 100;
+  else taxable -= discVal;
+  taxable = Math.max(0, taxable);
+  const taxRate = num(item.taxRate ?? item.gstRate);
+  const tax = (taxable * taxRate) / 100;
+  const half = tax / 2;
+  const isInter = taxType === "INTER_STATE";
+  return {
+    ...item,
+    taxableAmount: taxable,
+    taxAmount: tax,
+    cgstRate: isInter ? 0 : taxRate / 2,
+    sgstRate: isInter ? 0 : taxRate / 2,
+    igstRate: isInter ? taxRate : 0,
+    cgstAmount: isInter ? 0 : half,
+    sgstAmount: isInter ? 0 : half,
+    igstAmount: isInter ? tax : 0,
+    amount: taxable,
+    total: taxable + tax,
+  };
+}
+
+export function applyTotalsToValues(
+  values: InvoiceFormValues,
+): InvoiceFormValues {
+  const taxType = (values.taxType || "INTRA_STATE") as TaxType;
+  const items = (values.items || []).map((it) => lineTotals(it, taxType));
+  const filled = items.filter(
+    (it) => (it.itemName || it.productName || "").trim().length > 0,
+  );
+  let taxable = 0;
+  let cgst = 0;
+  let sgst = 0;
+  let igst = 0;
+  let qty = 0;
+  for (const it of filled) {
+    taxable += num(it.taxableAmount);
+    cgst += num(it.cgstAmount);
+    sgst += num(it.sgstAmount);
+    igst += num(it.igstAmount);
+    qty += num(it.quantity);
+  }
+  const grand = taxable + cgst + sgst + igst + num(values.roundOffAmount);
+  return {
+    ...values,
+    items,
+    totalItems: filled.length,
+    totalQuantity: qty,
+    taxableAmount: taxable,
+    cgstAmount: cgst,
+    sgstAmount: sgst,
+    igstAmount: igst,
+    grandTotal: grand,
+  };
+}
+
+/** Strip auth fields — backend sets tenantId / createdBy / businessId / branchId */
+export function sanitizeCreatePayload(values: InvoiceFormValues) {
+  const {
+    // never send
+    // @ts-expect-error strip if present
+    tenantId: _t,
+    // @ts-expect-error strip
+    createdBy: _c,
+    // @ts-expect-error strip
+    businessId: _b,
+    // @ts-expect-error strip
+    branchId: _br,
+    ...rest
+  } = values as InvoiceFormValues & Record<string, unknown>;
+
+  return {
+    invoiceType: rest.invoiceType || "B2B",
+    invoiceDate: rest.invoiceDate,
+    financialYear: rest.financialYear || null,
+    status: rest.status || "DRAFT",
+    buyerName: rest.buyerName,
+    buyerCompanyName: rest.buyerCompanyName || null,
+    buyerGSTIN: rest.buyerGSTIN || null,
+    buyerPAN: rest.buyerPAN || null,
+    buyerPhone: rest.buyerPhone,
+    buyerEmail: rest.buyerEmail || null,
+    billingAddressLine1: rest.billingAddressLine1,
+    billingAddressLine2: rest.billingAddressLine2 || null,
+    billingCity: rest.billingCity,
+    billingState: rest.billingState,
+    billingStateCode: rest.billingStateCode || null,
+    billingPincode: rest.billingPincode,
+    billingCountry: rest.billingCountry || "India",
+    sameAsBilling: rest.sameAsBilling ?? true,
+    // Always send shipping: mirror billing when sameAsBilling
+    shippingAddressLine1:
+      (rest.sameAsBilling ?? true)
+        ? rest.billingAddressLine1 || null
+        : rest.shippingAddressLine1 || null,
+    shippingAddressLine2:
+      (rest.sameAsBilling ?? true)
+        ? rest.billingAddressLine2 || null
+        : rest.shippingAddressLine2 || null,
+    shippingCity:
+      (rest.sameAsBilling ?? true)
+        ? rest.billingCity || null
+        : rest.shippingCity || null,
+    shippingState:
+      (rest.sameAsBilling ?? true)
+        ? rest.billingState || null
+        : rest.shippingState || null,
+    shippingStateCode:
+      (rest.sameAsBilling ?? true)
+        ? rest.billingStateCode || null
+        : rest.shippingStateCode || null,
+    shippingPincode:
+      (rest.sameAsBilling ?? true)
+        ? rest.billingPincode || null
+        : rest.shippingPincode || null,
+    shippingCountry:
+      (rest.sameAsBilling ?? true)
+        ? rest.billingCountry || "India"
+        : rest.shippingCountry || null,
+    placeOfSupply: rest.placeOfSupply,
+    placeOfSupplyCode: rest.placeOfSupplyCode || null,
+    taxType: rest.taxType || "INTRA_STATE",
+    reverseCharge: rest.reverseCharge ?? false,
+    isExport: rest.isExport ?? false,
+    isSEZ: rest.isSEZ ?? false,
+    currency: "INR",
+    items: (rest.items || [])
+      .filter((it) => (it.itemName || it.productName || "").trim())
+      .map((it) => ({
+        itemId: it.itemId || it.productId || null,
+        itemName: sanitizePlainText(it.itemName || it.productName || "", 200),
+        description: (() => {
+          const d = sanitizePlainText(it.description, 500);
+          return d || null;
+        })(),
+        hsnSac: (() => {
+          const h = sanitizePlainText(it.hsnSac || it.hsnSacCode, 12).replace(/[^0-9A-Za-z]/g, "");
+          return h || null;
+        })(),
+        unit: (() => {
+          const u = sanitizePlainText(it.unit, 20);
+          return u || null;
+        })(),
+        quantity: num(it.quantity),
+        rate: num(it.rate ?? it.price),
+        discount: num(it.discountValue ?? it.discount),
+        discountType: it.discountType || "PERCENTAGE",
+        taxRate: num(it.taxRate ?? it.gstRate),
+        taxAmount: num(it.taxAmount),
+        total: num(it.total),
+      })),
+    taxableAmount: num(rest.taxableAmount),
+    discountAmount: num(rest.discountAmount),
+    cgstAmount: num(rest.cgstAmount),
+    sgstAmount: num(rest.sgstAmount),
+    igstAmount: num(rest.igstAmount),
+    cessAmount: num(rest.cessAmount),
+    roundOffAmount: num(rest.roundOffAmount),
+    grandTotal: num(rest.grandTotal),
+    paymentStatus: rest.paymentStatus || "PENDING",
+    paymentMethod: rest.paymentMethod || "Cash",
+    paidAmount: num(rest.paidAmount),
+    paymentDate: rest.paymentDate || null,
+    transactionId: rest.transactionId || null,
+    showBankDetails: rest.showBankDetails ?? false,
+    showUPIDetails: rest.showUPIDetails ?? false,
+    businessLogo: rest.businessLogo || null,
+    notes: (() => {
+      const n = sanitizePlainText(rest.notes, 500);
+      return n || null;
+    })(),
+    termsAndConditions: (() => {
+      const x = sanitizePlainText(rest.termsAndConditions, 2000);
+      return x || "";
+    })(),
+    signature: rest.signature || null,
+  };
+}
+
+export function sanitizeUpdatePayload(values: InvoiceFormValues) {
+  return sanitizeCreatePayload(values);
+}
+
 
 function toNum(v: unknown, fallback = 0) {
   const n = Number(v);
@@ -38,52 +453,21 @@ function toNum(v: unknown, fallback = 0) {
 export function sanitizePlainText(raw: unknown, maxLen = 1000): string {
   if (raw == null) return "";
   let s = String(raw);
-  // Strip HTML tags and common entities
   s = s.replace(/<[^>]*>/g, " ");
   s = s.replace(/&lt;/gi, " ").replace(/&gt;/gi, " ").replace(/&quot;/gi, '"');
-  // Neutralize dangerous protocols / handlers
   s = s.replace(/javascript\s*:/gi, "");
   s = s.replace(/vbscript\s*:/gi, "");
   s = s.replace(/data\s*:\s*text\/html/gi, "");
   s = s.replace(/on\w+\s*=/gi, "");
-  // Strip raw URLs / links
   s = s.replace(/https?:\/\/[^\s]+/gi, "");
   s = s.replace(/www\.[^\s]+/gi, "");
   s = s.replace(/ftp:\/\/[^\s]+/gi, "");
-  // Control chars
   s = s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "");
-  // Collapse whitespace
   s = s.replace(/\s+/g, " ").trim();
   if (maxLen > 0 && s.length > maxLen) s = s.slice(0, maxLen);
   return s;
 }
 
-/** Ensure API gets full ISO datetime (date-only inputs → start/end of day) */
-export function toIsoDateTime(
-  value: string | null | undefined,
-  endOfDay = false,
-): string {
-  if (!value) return new Date().toISOString();
-  const raw = String(value).trim();
-
-  if (/T\d{2}:\d{2}/.test(raw)) {
-    const d = new Date(raw);
-    return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
-  }
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-    const [y, m, day] = raw.split("-").map(Number);
-    const d = endOfDay
-      ? new Date(y, m - 1, day, 23, 59, 59, 999)
-      : new Date(y, m - 1, day, 0, 0, 0, 0);
-    return d.toISOString();
-  }
-
-  const d = new Date(raw);
-  return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
-}
-
-/** Prefer price, fall back to rate */
 export function getUnitPrice(item: {
   price?: number | null;
   rate?: number | null;
@@ -107,11 +491,7 @@ export interface LineCalcResult {
 }
 
 /**
- * Real-time line calculation.
- * - discountType PERCENTAGE → % of gross
- * - discountType FIXED → absolute ₹ (capped at gross)
- * - taxType INTER_STATE → full tax as IGST
- * - taxType INTRA_STATE → split 50/50 CGST + SGST
+ * Real-time line calculation for invoice items.
  */
 export function calcLine(
   item: {
@@ -119,769 +499,43 @@ export function calcLine(
     price?: number | null;
     rate?: number | null;
     discount?: number | null;
-    discountType?: DiscountType | null;
+    discountValue?: number | null;
+    discountType?: string | null;
     taxRate?: number | null;
+    gstRate?: number | null;
   },
   taxType: TaxType = "INTRA_STATE",
 ): LineCalcResult {
   const qty = toNum(item.quantity);
   const unitPrice = getUnitPrice(item);
-  const discountVal = toNum(item.discount);
-  const discountType: DiscountType = item.discountType ?? "PERCENTAGE";
-  const taxRate = toNum(item.taxRate);
-
-  const gross = round2(qty * unitPrice);
-
-  let discountAmount =
-    discountType === "PERCENTAGE"
-      ? (gross * discountVal) / 100
-      : discountVal;
-  discountAmount = round2(Math.min(Math.max(discountAmount, 0), gross));
-
-  const taxable = round2(gross - discountAmount);
-  const taxAmount = round2((taxable * taxRate) / 100);
-
-  let cgstRate = 0;
-  let cgstAmount = 0;
-  let sgstRate = 0;
-  let sgstAmount = 0;
-  let igstRate = 0;
-  let igstAmount = 0;
-
-  if (taxType === "INTER_STATE") {
-    igstRate = taxRate;
-    igstAmount = taxAmount;
+  const discountVal = toNum(item.discountValue ?? item.discount);
+  const dtype = String(item.discountType || "PERCENTAGE").toUpperCase();
+  const gross = qty * unitPrice;
+  let discountAmount = 0;
+  if (dtype === "FIXED" || dtype === "fixed") {
+    discountAmount = Math.min(discountVal, gross);
   } else {
-    cgstRate = round2(taxRate / 2);
-    sgstRate = round2(taxRate - cgstRate);
-    cgstAmount = round2(taxAmount / 2);
-    sgstAmount = round2(taxAmount - cgstAmount);
+    discountAmount = (gross * discountVal) / 100;
   }
-
-  const total = round2(taxable + taxAmount);
-
+  const taxable = Math.max(0, gross - discountAmount);
+  const taxRate = toNum(item.taxRate ?? item.gstRate);
+  const taxAmount = (taxable * taxRate) / 100;
+  const isInter = taxType === "INTER_STATE";
+  const halfRate = taxRate / 2;
+  const halfAmt = taxAmount / 2;
   return {
     gross,
     discountAmount,
     taxable,
     taxAmount,
-    cgstRate,
-    cgstAmount,
-    sgstRate,
-    sgstAmount,
-    igstRate,
-    igstAmount,
-    total,
+    cgstRate: isInter ? 0 : halfRate,
+    cgstAmount: isInter ? 0 : halfAmt,
+    sgstRate: isInter ? 0 : halfRate,
+    sgstAmount: isInter ? 0 : halfAmt,
+    igstRate: isInter ? taxRate : 0,
+    igstAmount: isInter ? taxAmount : 0,
+    total: taxable + taxAmount,
   };
-}
-
-export interface CalculatedTotals {
-  items: Array<{
-    taxAmount: number;
-    amount: number;
-    total: number;
-    cgstRate: number;
-    cgstAmount: number;
-    sgstRate: number;
-    sgstAmount: number;
-    igstRate: number;
-    igstAmount: number;
-    discountAmount: number;
-    taxable: number;
-  }>;
-  totalItems: number;
-  totalQuantity: number;
-  taxableAmount: number;
-  discountAmount: number;
-  cgstAmount: number;
-  sgstAmount: number;
-  igstAmount: number;
-  cessAmount: number;
-  roundOffAmount: number;
-  grandTotal: number;
-}
-
-export function resolveTaxType(
-  businessStateCode?: string | null,
-  placeOfSupplyCode?: string | null,
-): TaxType {
-  const biz = (businessStateCode || "").trim();
-  const pos = (placeOfSupplyCode || "").trim();
-  if (!biz || !pos) return "INTRA_STATE";
-  return biz === pos ? "INTRA_STATE" : "INTER_STATE";
-}
-
-export function calculateInvoiceTotals(
-  items: InvoiceFormValues["items"] | InvoiceItem[] | undefined | null,
-  taxType: TaxType | null | undefined = "INTRA_STATE",
-): CalculatedTotals {
-  const effectiveTaxType: TaxType = taxType ?? "INTRA_STATE";
-
-  let totalQuantity = 0;
-  let taxableAmount = 0;
-  let discountAmount = 0;
-  let cgstAmount = 0;
-  let sgstAmount = 0;
-  let igstAmount = 0;
-
-  const list = items ?? [];
-
-  const calculatedItems = list.map((item) => {
-    const line = calcLine(item, effectiveTaxType);
-    totalQuantity += toNum(item.quantity);
-    taxableAmount += line.taxable;
-    discountAmount += line.discountAmount;
-    cgstAmount += line.cgstAmount;
-    sgstAmount += line.sgstAmount;
-    igstAmount += line.igstAmount;
-
-    return {
-      taxAmount: line.taxAmount,
-      amount: line.total,
-      total: line.total,
-      cgstRate: line.cgstRate,
-      cgstAmount: line.cgstAmount,
-      sgstRate: line.sgstRate,
-      sgstAmount: line.sgstAmount,
-      igstRate: line.igstRate,
-      igstAmount: line.igstAmount,
-      discountAmount: line.discountAmount,
-      taxable: line.taxable,
-    };
-  });
-
-  taxableAmount = round2(taxableAmount);
-  discountAmount = round2(discountAmount);
-  cgstAmount = round2(cgstAmount);
-  sgstAmount = round2(sgstAmount);
-  igstAmount = round2(igstAmount);
-
-  const totalTax = round2(cgstAmount + sgstAmount + igstAmount);
-  const rawGrand = taxableAmount + totalTax;
-  const grandTotal = Math.round(rawGrand);
-  const roundOffAmount = round2(grandTotal - rawGrand);
-
-  return {
-    items: calculatedItems,
-    totalItems: list.length,
-    totalQuantity: round2(totalQuantity),
-    taxableAmount,
-    discountAmount,
-    cgstAmount,
-    sgstAmount,
-    igstAmount,
-    cessAmount: 0,
-    roundOffAmount,
-    grandTotal,
-  };
-}
-
-export function emptyLineItem(): InvoiceFormValues["items"][number] {
-  return {
-    itemId: null,
-    itemName: "",
-    description: null,
-    hsnSac: null,
-    quantity: 1,
-    unit: "PCS",
-    rate: 0,
-    price: 0,
-    discount: 0,
-    discountType: "PERCENTAGE",
-    taxRate: 18,
-    taxAmount: 0,
-    cgstRate: 9,
-    cgstAmount: 0,
-    sgstRate: 9,
-    sgstAmount: 0,
-    igstRate: 0,
-    igstAmount: 0,
-    amount: 0,
-    total: 0,
-    stockAvailable: null,
-  };
-}
-
-export function resolveFinancialYear(dateStr?: string | null): string {
-  // Prefer YYYY-MM-DD parts so timezone does not shift the calendar day
-  let y: number;
-  let m: number; // 1–12
-  const raw = (dateStr || "").trim();
-  const mDate = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (mDate) {
-    y = Number(mDate[1]);
-    m = Number(mDate[2]);
-  } else {
-    const d = raw ? new Date(raw) : new Date();
-    if (Number.isNaN(d.getTime())) {
-      const now = new Date();
-      y = now.getFullYear();
-      m = now.getMonth() + 1;
-    } else {
-      y = d.getFullYear();
-      m = d.getMonth() + 1;
-    }
-  }
-  // Indian FY: Apr (04) – Mar (03)
-  // e.g. 2025-04-01 → 2025-26 | 2026-03-31 → 2025-26 | 2026-04-01 → 2026-27
-  if (m >= 4) {
-    return `${y}-${String(y + 1).slice(-2)}`;
-  }
-  return `${y - 1}-${String(y).slice(-2)}`;
-}
-
-export function getDefaultInvoiceValues(
-  tenantId = "",
-  createdBy = "",
-): InvoiceFormValues {
-  return {
-    tenantId,
-    createdBy,
-    branchId: null,
-    invoiceDate: new Date().toISOString().slice(0, 10),
-    dueDate: "",
-    financialYear: resolveFinancialYear(new Date().toISOString()),
-
-    businessName: "",
-    businessLegalName: null,
-    businessGSTIN: null,
-    businessPAN: null,
-    businessPhone: null,
-    businessEmail: null,
-    businessAddressLine1: null,
-    businessAddressLine2: null,
-    businessCity: null,
-    businessState: null,
-    businessStateCode: null,
-    businessPincode: null,
-    businessCountry: "India",
-
-businessBankName: null,
-businessBankAccountNumber: null,
-businessBankIFSC: null,
-businessBankBranch: null,
-businessUPIId: null,
-
-showBankDetails: false,
-showUPIDetails: false,
-    prospectName: "",
-    prospectCompanyName: null,
-    prospectGSTIN: null,
-    prospectPAN: null,
-    prospectPhone: "",
-    prospectEmail: null,
-    prospectAddressLine1: "",
-    prospectAddressLine2: null,
-    prospectCity: "",
-    prospectState: "",
-    prospectStateCode: null,
-    prospectPincode: "",
-    prospectCountry: "India",
-
-    customerId: null,
-    placeOfSupply: "",
-    placeOfSupplyCode: null,
-    taxType: "INTRA_STATE",
-    reverseCharge: false,
-    isExport: false,
-    isSEZ: false,
-    invoiceType: "B2B",
-    currency: "INR",
-    exchangeRate: null,
-
-    items: [emptyLineItem()],
-
-    totalItems: 1,
-    totalQuantity: 0,
-    taxableAmount: 0,
-    discountAmount: 0,
-    cgstAmount: 0,
-    sgstAmount: 0,
-    igstAmount: 0,
-    cessAmount: 0,
-    roundOffAmount: 0,
-    grandTotal: 0,
-
-    paymentStatus: "PENDING",
-    paymentMethod: "Cash",
-    paidAmount: 0,
-    paymentDate: null,
-    transactionId: null,
-
-    notes: null,
-    termsAndConditions: "",
-    signature: undefined,
-  } as InvoiceFormValues;
-}
-
-export function mapInvoiceToFormValues(
-  q: Invoice,
-  fallbacktenantId?: string,
-  fallbackCreatedBy?: string,
-): InvoiceFormValues {
-  return {
-    tenantId: q.tenantId || fallbacktenantId || "",
-    createdBy: q.createdBy || fallbackCreatedBy || "",
-    branchId: q.branchId ?? null,
-    invoiceDate: q.invoiceDate?.slice(0, 10) ?? "",
-    dueDate: q.dueDate?.slice(0, 10) ?? "",
-    financialYear: resolveFinancialYear(q.invoiceDate),
-
-    businessName: q.businessName ?? "",
-    businessLegalName: q.businessLegalName ?? null,
-    businessGSTIN: q.businessGSTIN ?? null,
-    businessPAN: q.businessPAN ?? null,
-    businessPhone: q.businessPhone ?? null,
-    businessEmail: q.businessEmail ?? null,
-    businessAddressLine1: q.businessAddressLine1 ?? null,
-    businessAddressLine2: q.businessAddressLine2 ?? null,
-    businessCity: q.businessCity ?? null,
-    businessState: q.businessState ?? null,
-    businessStateCode: q.businessStateCode ?? null,
-    businessPincode: q.businessPincode ?? null,
-    businessCountry: q.businessCountry ?? "India",
-
-businessBankName: q.businessBankName ?? null,
-businessBankAccountNumber: q.businessBankAccountNumber ?? null,
-businessBankIFSC: q.businessBankIFSC ?? null,
-businessBankBranch: q.businessBankBranch ?? null,
-businessUPIId: q.businessUPIId ?? null,
-
-showBankDetails: q.showBankDetails ?? false,
-showUPIDetails: q.showUPIDetails ?? false,
-
-    prospectName: q.prospectName ?? "",
-    prospectCompanyName: q.prospectCompanyName ?? null,
-    prospectGSTIN: q.prospectGSTIN ?? null,
-    prospectPAN: q.prospectPAN ?? null,
-    prospectPhone: q.prospectPhone ?? "",
-    prospectEmail: q.prospectEmail ?? null,
-    prospectAddressLine1: q.prospectAddressLine1 ?? "",
-    prospectAddressLine2: q.prospectAddressLine2 ?? null,
-    prospectCity: q.prospectCity ?? "",
-    prospectState: q.prospectState ?? "",
-    prospectStateCode: q.prospectStateCode ?? null,
-    prospectPincode: q.prospectPincode ?? "",
-    prospectCountry: q.prospectCountry ?? "India",
-
-    customerId: q.customerId ?? null,
-    placeOfSupply: q.placeOfSupply ?? "",
-    placeOfSupplyCode: q.placeOfSupplyCode ?? null,
-    taxType: q.taxType ?? "INTRA_STATE",
-    reverseCharge: q.reverseCharge ?? false,
-    isExport: q.isExport ?? false,
-    isSEZ: q.isSEZ ?? false,
-    invoiceType: (q as { invoiceType?: string }).invoiceType ?? "B2B",
-    currency: q.currency ?? "INR",
-    exchangeRate: q.exchangeRate ?? null,
-
-    items:
-      q.items?.length > 0
-        ? q.items.map((item) => {
-            const unitPrice = getUnitPrice(item);
-            return {
-              id: item.id,
-              itemId: item.itemId ?? null,
-              itemName: item.itemName ?? "",
-              description: item.description ?? null,
-              hsnSac: item.hsnSac ?? null,
-              quantity: item.quantity ?? 1,
-              unit: item.unit ?? "PCS",
-              rate: unitPrice,
-              price: unitPrice,
-              discount: item.discount ?? 0,
-              discountType: item.discountType ?? "PERCENTAGE",
-              taxRate: item.taxRate ?? 0,
-              taxAmount: item.taxAmount ?? 0,
-              cgstRate: item.cgstRate ?? 0,
-              cgstAmount: item.cgstAmount ?? 0,
-              sgstRate: item.sgstRate ?? 0,
-              sgstAmount: item.sgstAmount ?? 0,
-              igstRate: item.igstRate ?? 0,
-              igstAmount: item.igstAmount ?? 0,
-              amount: item.amount ?? item.total ?? 0,
-              total: item.total ?? item.amount ?? 0,
-              stockAvailable: (item as { stockAvailable?: number | null }).stockAvailable ?? null,
-            };
-          })
-        : [emptyLineItem()],
-
-    totalItems: q.totalItems ?? 0,
-    totalQuantity: q.totalQuantity ?? 0,
-    taxableAmount: q.taxableAmount ?? 0,
-    discountAmount: q.discountAmount ?? 0,
-    cgstAmount: q.cgstAmount ?? 0,
-    sgstAmount: q.sgstAmount ?? 0,
-    igstAmount: q.igstAmount ?? 0,
-    cessAmount: q.cessAmount ?? 0,
-    roundOffAmount: q.roundOffAmount ?? 0,
-    grandTotal: q.grandTotal ?? 0,
-
-    paymentStatus: (q as { paymentStatus?: string }).paymentStatus ?? "PENDING",
-    paymentMethod: (q as { paymentMethod?: string | null }).paymentMethod ?? "Cash",
-    paidAmount: Number((q as { paidAmount?: number }).paidAmount ?? 0),
-    paymentDate: (q as { paymentDate?: string | null }).paymentDate ?? null,
-    transactionId: (q as { transactionId?: string | null }).transactionId ?? null,
-
-    notes: q.notes ?? null,
-    termsAndConditions: q.termsAndConditions ?? "",
-    signature: q.signature ?? null,
-  } as InvoiceFormValues;
-}
-
-export function getSessionFormDefaults(session: {
-  user: { id: string } | null;
-  business: {
-    id: string;
-    name: string;
-    legalName?: string | null;
-    gstin?: string | null;
-    pan?: string | null;
-    phone?: string | null;
-    email?: string | null;
-    addressLine1?: string | null;
-    addressLine2?: string | null;
-    city?: string | null;
-    state?: string | null;
-    stateCode?: string | null;
-    pincode?: string | null;
-    country: string;
-
-     bankName?: string | null;
-  bankAccountNumber?: string | null;
-  bankIFSC?: string | null;
-  bankBranch?: string | null;
-  upiId?: string | null;
-
-    branchId?: string | null;
-  } | null;
-} | null): Partial<InvoiceFormValues> {
-  if (!session) return {};
-
-  const { business, user } = session;
-  const stateCode =
-    business?.stateCode || getStateCode(business?.state || undefined) || null;
-
-  return {
-    tenantId: business?.id ?? "",
-    createdBy: user?.id ?? "",
-    branchId: business?.branchId ?? null,
-    businessName: business?.name ?? "",
-    businessLegalName: business?.legalName ?? null,
-    businessGSTIN: business?.gstin ?? null,
-    businessPAN: business?.pan ?? null,
-    businessPhone: business?.phone ?? null,
-    businessEmail: business?.email ?? null,
-    businessAddressLine1: business?.addressLine1 ?? null,
-    businessAddressLine2: business?.addressLine2 ?? null,
-    businessCity: business?.city ?? null,
-    businessState: business?.state ?? null,
-    businessStateCode: stateCode,
-    businessPincode: business?.pincode ?? null,
-    businessCountry: business?.country ?? "India",
-
-    businessBankName: business?.bankName ?? null,
-businessBankAccountNumber: business?.bankAccountNumber ?? null,
-businessBankIFSC: business?.bankIFSC ?? null,
-businessBankBranch: business?.bankBranch ?? null,
-businessUPIId: business?.upiId ?? null,
-
-showBankDetails: false,
-showUPIDetails: false,
-    businessLogo: (business as { logo?: string | null } | null | undefined)?.logo ?? null,
-  };
-}
-
-/** Apply live totals + per-line GST split into form values */
-export function applyTotalsToValues(
-  values: InvoiceFormValues,
-): InvoiceFormValues {
-  const taxType =
-    values.taxType ??
-    resolveTaxType(values.businessStateCode, values.placeOfSupplyCode);
-
-  const totals = calculateInvoiceTotals(values.items, taxType);
-
-  const items = values.items.map((item, i) => {
-    const line = totals.items[i];
-    const unitPrice = getUnitPrice(item);
-    return {
-      ...item,
-      rate: unitPrice,
-      price: unitPrice,
-      taxAmount: line?.taxAmount ?? 0,
-      amount: line?.amount ?? 0,
-      total: line?.total ?? 0,
-      cgstRate: line?.cgstRate ?? 0,
-      cgstAmount: line?.cgstAmount ?? 0,
-      sgstRate: line?.sgstRate ?? 0,
-      sgstAmount: line?.sgstAmount ?? 0,
-      igstRate: line?.igstRate ?? 0,
-      igstAmount: line?.igstAmount ?? 0,
-    };
-  });
-
-  return {
-    ...values,
-    taxType,
-    items,
-    totalItems: totals.totalItems,
-    totalQuantity: totals.totalQuantity,
-    taxableAmount: totals.taxableAmount,
-    discountAmount: totals.discountAmount,
-    cgstAmount: totals.cgstAmount,
-    sgstAmount: totals.sgstAmount,
-    igstAmount: totals.igstAmount,
-    cessAmount: totals.cessAmount,
-    roundOffAmount: totals.roundOffAmount,
-    grandTotal: totals.grandTotal,
-  };
-}
-
-
-/** Indian FY: Apr–Mar → "2025-26" */
-export function sanitizeCreatePayload(
-  values: InvoiceFormValues,
-): InvoiceCreatePayload {
-  const withTotals = applyTotalsToValues(values);
-  const rest = withTotals;
-
-
-// tenantId / branchId / createdBy omitted — backend uses auth
-return {
-  invoiceDate: toIsoDateTime(
-    rest.invoiceDate,
-    false,
-  ),
-
-  dueDate: toIsoDateTime(
-    rest.dueDate,
-    true,
-  ),
-
-  financialYear: resolveFinancialYear(rest.invoiceDate),
-
-  businessName: rest.businessName,
-  businessLegalName: rest.businessLegalName || null,
-  businessGSTIN: rest.businessGSTIN || null,
-  businessPAN: rest.businessPAN || null,
-  businessPhone: rest.businessPhone || null,
-  businessEmail: rest.businessEmail || null,
-  businessAddressLine1:
-    rest.businessAddressLine1 || null,
-  businessAddressLine2:
-    rest.businessAddressLine2 || null,
-  businessCity: rest.businessCity || null,
-  businessState: rest.businessState || null,
-  businessStateCode:
-    rest.businessStateCode || null,
-  businessPincode:
-    rest.businessPincode || null,
-  businessCountry:
-    rest.businessCountry || "India",
-
-  showBankDetails:
-    rest.showBankDetails ?? false,
-
-  showUPIDetails:
-    rest.showUPIDetails ?? false,
-
-  businessLogo: rest.businessLogo || null,
-
-  ...(rest.showBankDetails
-    ? {
-        businessBankName:
-          rest.businessBankName || null,
-
-        businessBankAccountNumber:
-          rest.businessBankAccountNumber || null,
-
-        businessBankIFSC:
-          rest.businessBankIFSC || null,
-
-        businessBankBranch:
-          rest.businessBankBranch || null,
-      }
-    : {}),
-
-  ...(rest.showUPIDetails
-    ? {
-        businessUPIId:
-          rest.businessUPIId || null,
-      }
-    : {}),
-
-  prospectName: rest.prospectName,
-  prospectCompanyName:
-    rest.prospectCompanyName || null,
-  prospectGSTIN:
-    rest.prospectGSTIN || null,
-  prospectPAN:
-    rest.prospectPAN || null,
-  prospectPhone:
-    rest.prospectPhone || null,
-  prospectEmail:
-    rest.prospectEmail || null,
-  prospectAddressLine1:
-    rest.prospectAddressLine1 || null,
-  prospectAddressLine2:
-    rest.prospectAddressLine2 || null,
-  prospectCity:
-    rest.prospectCity || null,
-  prospectState:
-    rest.prospectState || null,
-  prospectStateCode:
-    rest.prospectStateCode || null,
-  prospectPincode:
-    rest.prospectPincode || null,
-  prospectCountry:
-    rest.prospectCountry || "India",
-
-  customerId: rest.customerId || null,
-  placeOfSupply: rest.placeOfSupply || null,
-  placeOfSupplyCode:
-    rest.placeOfSupplyCode || null,
-
-  taxType: rest.taxType || "INTRA_STATE",
-  reverseCharge: rest.reverseCharge ?? false,
-  isExport: rest.isExport ?? false,
-  isSEZ: rest.isSEZ ?? false,
-
-  invoiceType: rest.invoiceType || "B2B",
-  currency: rest.currency || "INR",
-  exchangeRate: rest.exchangeRate ?? null,
-
-  items: rest.items.map((item) => {
-    const unitPrice = getUnitPrice(item);
-
-    return {
-      id: item.id,
-      itemId: item.itemId || null,
-      itemName: sanitizePlainText(item.itemName, 200),
-      description: (() => {
-        const d = sanitizePlainText(item.description, 1000);
-        return d || null;
-      })(),
-      hsnSac: (() => {
-        const h = sanitizePlainText(item.hsnSac, 12).replace(/[^0-9A-Za-z]/g, "");
-        return h || null;
-      })(),
-      quantity: clampQty(item.quantity),
-      unit: item.unit || null,
-      rate: clampMoney(unitPrice),
-      price: clampMoney(unitPrice),
-      discount: clampMoney(item.discount),
-
-      discountType:
-        item.discountType || "PERCENTAGE",
-      taxRate: toNum(item.taxRate),
-      taxAmount: toNum(item.taxAmount),
-      cgstRate: toNum(item.cgstRate),
-      cgstAmount: toNum(item.cgstAmount),
-      sgstRate: toNum(item.sgstRate),
-      sgstAmount: toNum(item.sgstAmount),
-      igstRate: toNum(item.igstRate),
-      igstAmount: toNum(item.igstAmount),
-      amount: toNum(
-        item.amount ?? item.total,
-      ),
-      total: toNum(
-        item.total ?? item.amount,
-      ),
-    };
-  }),
-
-  totalItems: rest.totalItems,
-  totalQuantity: rest.totalQuantity,
-  taxableAmount: rest.taxableAmount,
-  discountAmount: rest.discountAmount,
-  cgstAmount: rest.cgstAmount,
-  sgstAmount: rest.sgstAmount,
-  igstAmount: rest.igstAmount,
-  cessAmount: rest.cessAmount,
-  roundOffAmount: rest.roundOffAmount,
-  grandTotal: rest.grandTotal,
-
-  paymentStatus: (rest.paymentStatus as string) || "PENDING",
-  paymentMethod: rest.paymentMethod || "Cash",
-  paidAmount: toNum(rest.paidAmount),
-  paymentDate: rest.paymentDate
-    ? toIsoDateTime(String(rest.paymentDate), false)
-    : null,
-  transactionId: rest.transactionId || null,
-
-  notes: (() => {
-    const n = sanitizePlainText(rest.notes, 10000);
-    return n || null;
-  })(),
-  termsAndConditions: (() => {
-    // Terms may contain minimal formatting from editor — strip scripts/tags aggressively
-    const t = sanitizePlainText(rest.termsAndConditions, 10000);
-    return t || null;
-  })(),
-  signature: rest.signature || null,
-  status: (rest.status as import("../types/invoice.types").InvoiceStatus | undefined) ?? "DRAFT",
-};
-}
-
-export function sanitizeUpdatePayload(
-  values: InvoiceFormValues,
-): InvoiceUpdatePayload {
-  // tenantId / branchId / createdBy / updatedBy never sent — backend auth
-  return sanitizeCreatePayload(values) as InvoiceUpdatePayload;
-}
-
-/** Format INR for display */
-export function formatINR(value: number) {
-  return Number(value || 0).toLocaleString("en-IN", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  });
-}
-
-
-/** Indian numbering amount-in-words (Rupees) */
-const ONES = [
-  "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
-  "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen",
-  "Seventeen", "Eighteen", "Nineteen",
-];
-const TENS = [
-  "", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety",
-];
-
-function twoDigits(n: number): string {
-  if (n < 20) return ONES[n];
-  const t = Math.floor(n / 10);
-  const o = n % 10;
-  return `${TENS[t]}${o ? ` ${ONES[o]}` : ""}`.trim();
-}
-
-function threeDigits(n: number): string {
-  if (n === 0) return "";
-  const h = Math.floor(n / 100);
-  const r = n % 100;
-  const head = h ? `${ONES[h]} Hundred` : "";
-  const tail = r ? twoDigits(r) : "";
-  return [head, tail].filter(Boolean).join(" ");
-}
-
-export function amountInWords(amount: number): string {
-  const n = Math.round(Math.abs(Number(amount) || 0));
-  if (n === 0) return "Zero Rupees Only";
-
-  const crore = Math.floor(n / 10000000);
-  const lakh = Math.floor((n % 10000000) / 100000);
-  const thousand = Math.floor((n % 100000) / 1000);
-  const hundred = n % 1000;
-
-  const parts: string[] = [];
-  if (crore) parts.push(`${threeDigits(crore)} Crore`);
-  if (lakh) parts.push(`${threeDigits(lakh)} Lakh`);
-  if (thousand) parts.push(`${threeDigits(thousand)} Thousand`);
-  if (hundred) parts.push(threeDigits(hundred));
-
-  return `${parts.join(" ")} Rupees Only`;
 }
 
 

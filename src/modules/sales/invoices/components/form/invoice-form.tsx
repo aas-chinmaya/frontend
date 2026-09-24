@@ -102,7 +102,7 @@ export function InvoiceForm({
 
   const { reset, setValue, control } = form;
 
-  const businessStateCode = useWatch({ control, name: "businessStateCode" });
+  const businessStateCode = useWatch({ control, name: "sellerStateCode" });
   const placeOfSupplyCode = useWatch({ control, name: "placeOfSupplyCode" });
   const items = useWatch({ control, name: "items" });
   const invoiceDate = useWatch({ control, name: "invoiceDate" });
@@ -178,7 +178,7 @@ export function InvoiceForm({
   useEffect(() => {
     if (mode !== "create" || !session) return;
     const current = form.getValues();
-    if (!current.businessName && session.business?.name) {
+    if (!current.sellerTradeName && session.business?.name) {
       reset({
         ...getDefaultInvoiceValues(
           session.business?.id ?? "",
@@ -195,21 +195,21 @@ export function InvoiceForm({
     errs: Record<string, unknown>,
   ): string => {
     const labels: Record<string, string> = {
-      prospectName: "Customer name",
-      prospectPhone: "Customer phone",
-      prospectEmail: "Customer email",
-      prospectAddressLine1: "Customer address",
-      prospectCity: "Customer city",
-      prospectPincode: "Customer pincode",
-      prospectState: "Customer state",
-      prospectCountry: "Customer country",
+      buyerName: "Customer name",
+      buyerPhone: "Customer phone",
+      buyerEmail: "Customer email",
+      billingAddressLine1: "Customer address",
+      billingCity: "Customer city",
+      billingPincode: "Customer pincode",
+      billingState: "Customer state",
+      billingCountry: "Customer country",
       placeOfSupply: "Place of supply",
       invoiceDate: "Invoice date",
-      dueDate: "Due date",
+      invoiceDate: "Invoice date",
       termsAndConditions: "Terms & conditions",
       signature: "Authorized signatory",
       items: "Product items",
-      businessName: "Business name",
+      sellerTradeName: "Business name",
       transactionId: "Transaction / reference ID",
       paymentMethod: "Payment method",
     };
@@ -255,15 +255,15 @@ export function InvoiceForm({
           if (issue?.message) {
             const path = Array.isArray(issue.path) ? issue.path[0] : "";
             const labels: Record<string, string> = {
-              prospectName: "Customer name",
-              prospectPhone: "Customer phone",
-              prospectAddressLine1: "Customer address",
-              prospectCity: "Customer city",
-              prospectPincode: "Customer pincode",
-              prospectState: "Customer state",
+              buyerName: "Customer name",
+              buyerPhone: "Customer phone",
+              billingAddressLine1: "Customer address",
+              billingCity: "Customer city",
+              billingPincode: "Customer pincode",
+              billingState: "Customer state",
               placeOfSupply: "Place of supply",
               invoiceDate: "Invoice date",
-              dueDate: "Due date",
+              invoiceDate: "Invoice date",
               termsAndConditions: "Terms & conditions",
               items: "Product items",
               transactionId: "Transaction / reference ID",

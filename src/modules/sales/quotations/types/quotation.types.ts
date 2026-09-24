@@ -102,7 +102,6 @@ showUPIDetails: boolean;
   prospectPincode?: string | null;
   prospectCountry: string;
 
-  customerId?: string | null;
   customer?: QuotationCustomer | null;
 
   placeOfSupply?: string | null;
@@ -149,7 +148,6 @@ export interface QuotationListParams {
   limit?: number;
   search?: string;
   status?: QuotationStatus;
-  customerId?: string;
   branchId?: string;
   financialYear?: string;
   fromDate?: string;
@@ -225,7 +223,6 @@ showUPIDetails?: boolean;
   prospectPincode?: string | null;
   prospectCountry?: string;
 
-  customerId?: string | null;
   placeOfSupply?: string | null;
   placeOfSupplyCode?: string | null;
   taxType?: TaxType | null;

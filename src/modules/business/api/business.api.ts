@@ -121,6 +121,7 @@ export const businessApi = {
       openingDate: (data as any).openingDate
         ? new Date((data as any).openingDate).toISOString()
         : undefined,
+      users: (data as any).users,
     };
 
     if (data.managerId && data.managerId.trim()) {
@@ -132,6 +133,12 @@ export const businessApi = {
 
   getBranchById(branchId: string) {
     return api.get<BackendBusinessResponse>(`/business/business-branches/getBranchById/${branchId}`);
+  },
+
+  getBranchDetailsByUser() {
+    return api.get<BackendBusinessResponse>("/business/business-branches/getBranchByUser", {
+      withCredentials: true,
+    });
   },
 
   updateBranch(branchId: string, data: BusinessBranchData) {

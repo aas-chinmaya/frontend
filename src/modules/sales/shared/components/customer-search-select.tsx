@@ -292,9 +292,8 @@ export default function CustomerSearchSelect({
     const search = query.trim().toLowerCase();
     const list = customers ?? [];
 
-    if (!search || selectedCustomer) {
-      return list;
-    }
+    // Always return list for dropdown; filter only when user typed search text
+    if (!search) return list;
 
     return list.filter((customer) => {
       const values = [
@@ -306,7 +305,7 @@ export default function CustomerSearchSelect({
       ];
       return values.some((value) => value.toLowerCase().includes(search));
     });
-  }, [query, customers, selectedCustomer]);
+  }, [query, customers]);
 
   const selectCustomer = (
     customer: Customer,

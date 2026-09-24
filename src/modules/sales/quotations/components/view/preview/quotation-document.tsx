@@ -14,13 +14,13 @@ const STATUS_BADGE: Record<
   QuotationStatus,
   { className: string; label: string }
 > = {
-  FINALIZED: { className: "bg-indigo-100 text-indigo-800", label: "Finalized" },
-  DRAFT: { className: "bg-[var(--neutral)]", label: "Draft" },
-  SENT: { className: "bg-[var(--info)]", label: "Sent" },
-  ACCEPTED: { className: "bg-[var(--success)]", label: "Accepted" },
-  REJECTED: { className: "bg-[var(--danger)]", label: "Rejected" },
-  CANCELLED: { className: "bg-[var(--danger)]", label: "Cancelled" },
-  EXPIRED: { className: "bg-[var(--warning)]", label: "Expired" },
+  DRAFT: { className: "bg-ink-muted", label: "Draft" },
+  FINALIZED: { className: "bg-accent", label: "Finalized" },
+  SENT: { className: "bg-accent", label: "Sent" },
+  ACCEPTED: { className: "bg-add", label: "Accepted" },
+  REJECTED: { className: "bg-remove", label: "Rejected" },
+  CANCELLED: { className: "bg-remove", label: "Cancelled" },
+  EXPIRED: { className: "bg-ink-muted", label: "Expired" },
 };
 
 function formatDate(value?: string | null) {
@@ -226,8 +226,8 @@ export function QuotationDocument({ quotation }: QuotationDocumentProps) {
         </div>
 
         {/* Items — horizontal scroll on small screens */}
-        <div className="w-full overflow-x-auto">
-          <div className="min-w-[640px]">
+        <div className="w-full min-w-0">
+          <div className="min-w-0">
             <QuotationItemsTable
               items={quotation.items || []}
               taxType={quotation.taxType}

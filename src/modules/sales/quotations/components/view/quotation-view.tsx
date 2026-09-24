@@ -1,19 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { PanelRightClose, X } from "lucide-react";
-
 import { notify } from "@/lib/toast";
 import {
   useGetQuotationByIdQuery,
   useUpdateQuotationStatusMutation,
   useDownloadQuotationPdfMutation,
 } from "../../api/quotation.api";
-import type { Quotation } from "../../types/quotation.types";
 import { QuotationViewHeader } from "./header/quotation-view-header";
 import { QuotationPreview } from "./quotation-preview";
-import { QuotationSidebar } from "./sidebar/quotation-sidebar";
 
 interface QuotationViewProps {
   id: string;
@@ -21,7 +17,6 @@ interface QuotationViewProps {
 
 export function QuotationView({ id }: QuotationViewProps) {
   const router = useRouter();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const {
     data: response,
@@ -32,7 +27,7 @@ export function QuotationView({ id }: QuotationViewProps) {
 
   const [updateStatus, { isLoading: statusLoading }] =
     useUpdateQuotationStatusMutation();
-  const [downloadPdf, { isLoading: pdfLoading }] =
+  const [downloadPdf, { isLoading: downloadLoading }] =
     useDownloadQuotationPdfMutation();
 
   const quotation = response?.data ?? null;
@@ -43,10 +38,24 @@ export function QuotationView({ id }: QuotationViewProps) {
     : null;
 
   useEffect(() => {
-    if (error && !quotation) {
-      notify.error(error);
-    }
+    if (error && !quotation) notify.error(error);
   }, [error, quotation]);
+
+  const handleStatusChange = async (
+    status: "ACCEPTED" | "REJECTED" | "CANCELLED" | "SENT" | "FINALIZED",
+  ) => {
+    if (!quotation?.id) return;
+    try {
+      const res = await updateStatus({
+        id: quotation.id,
+        data: { status },
+      }).unwrap();
+      notify.success(res.message || `Status updated to ${status}`);
+    } catch (err: unknown) {
+      const e = err as { data?: { message?: string }; message?: string };
+      notify.error(e?.data?.message || e?.message || "Failed to update status");
+    }
+  };
 
   const handleDownload = async () => {
     if (!quotation?.id) return;
@@ -67,39 +76,17 @@ export function QuotationView({ id }: QuotationViewProps) {
     }
   };
 
-  const handleStatusChange = async (
-    status: "ACCEPTED" | "REJECTED",
-    statusNote: string,
-  ) => {
-    if (!quotation?.id) return;
-    try {
-      const res = await updateStatus({
-        id: quotation.id,
-        data: { status, remarks: statusNote },
-      }).unwrap();
-      notify.success(res.message || `Status updated to ${status}`);
-    } catch (err: unknown) {
-      const e = err as { data?: { message?: string }; message?: string };
-      notify.error(
-        e?.data?.message || e?.message || "Failed to update status",
-      );
-    }
-  };
-
   if (loading && !quotation) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
-          <p className="text-sm text-gray-500">Loading quotation…</p>
-        </div>
+      <div className="flex min-h-[50vh] w-full items-center justify-center">
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
       </div>
     );
   }
 
   if (!quotation) {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-gray-50">
+      <div className="flex min-h-[50vh] w-full flex-col items-center justify-center gap-3">
         <p className="text-sm text-destructive">Quotation not found</p>
         <button
           type="button"
@@ -113,61 +100,17 @@ export function QuotationView({ id }: QuotationViewProps) {
   }
 
   return (
-    <div className="relative flex min-h-screen w-full overflow-hidden rounded-lg">
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <QuotationViewHeader
-          quotation={quotation}
-          onOpenSidebar={() => setSidebarOpen(true)}
-          onStatusChange={handleStatusChange}
-          statusLoading={statusLoading}
-          onDownload={handleDownload}
-          downloadLoading={pdfLoading}
-        />
-        <div className="min-h-0 flex-1 overflow-auto bg-slate-50 p-3 sm:p-4">
-          <QuotationPreview quotation={quotation} />
-        </div>
+    <div className="flex min-h-0 w-full flex-col">
+      <QuotationViewHeader
+        quotation={quotation}
+        onStatusChange={handleStatusChange}
+        onDownload={handleDownload}
+        statusLoading={statusLoading}
+        downloadLoading={downloadLoading}
+      />
+      <div className="min-h-0 flex-1 overflow-auto bg-slate-50 p-3 sm:p-4 md:p-6">
+        <QuotationPreview quotation={quotation} />
       </div>
-
-      {/* Desktop sidebar */}
-      <aside className="hidden w-80 shrink-0 border-l border-slate-200 bg-white lg:block">
-        <QuotationSidebar quotation={quotation} />
-      </aside>
-
-      {/* Mobile sidebar drawer */}
-      {sidebarOpen ? (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/40"
-            aria-label="Close sidebar"
-            onClick={() => setSidebarOpen(false)}
-          />
-          <div className="absolute right-0 top-0 flex h-full w-[min(100%,20rem)] flex-col bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
-              <span className="text-sm font-medium text-slate-700">Details</span>
-              <button
-                type="button"
-                onClick={() => setSidebarOpen(false)}
-                className="rounded p-1 text-slate-500 hover:bg-slate-100"
-                aria-label="Close"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-auto">
-              <QuotationSidebar quotation={quotation} />
-            </div>
-            <button
-              type="button"
-              onClick={() => setSidebarOpen(false)}
-              className="flex items-center justify-center gap-2 border-t border-slate-100 py-2 text-sm text-slate-600"
-            >
-              <PanelRightClose className="size-4" />
-              Close
-            </button>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

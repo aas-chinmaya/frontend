@@ -280,6 +280,10 @@ export function useBusinessSetup({
     }
   }
 
+  function skip() {
+    router.push("/business-setup/manage-business");
+  }
+
   return {
     form,
     steps: wizardSteps,
@@ -299,6 +303,7 @@ export function useBusinessSetup({
     goBack,
     goToStep,
     submit,
+    skip,
   };
 }
 

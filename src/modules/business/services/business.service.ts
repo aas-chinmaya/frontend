@@ -31,6 +31,11 @@ export const businessService = {
     return response.data?.data ?? null;
   },
 
+  async getBranchDetailsByUser() {
+    const response = await businessApi.getBranchDetailsByUser();
+    return response.data?.data ?? null;
+  },
+
   async updateBranch(branchId: string, payload: Record<string, unknown>) {
     const response = await businessApi.updateBranch(branchId, payload as any);
     return response.data?.data ?? null;

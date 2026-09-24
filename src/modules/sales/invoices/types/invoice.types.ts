@@ -1,6 +1,8 @@
 // ============================================================
-// INVOICE TYPES
+// INVOICE TYPES — invoice module naming (buyer / seller)
 // ============================================================
+
+export type InvoiceType = "B2B" | "B2C" | "EXPORT" | "SEZ";
 
 export type InvoiceStatus =
   | "DRAFT"
@@ -11,13 +13,7 @@ export type InvoiceStatus =
   | "OVERDUE"
   | "CANCELLED";
 
-export type InvoiceType = "B2B" | "B2C" | "EXPORT" | "SEZ";
-
-export type PaymentStatus =
-  | "PENDING"
-  | "PARTIAL"
-  | "PAID"
-  | "OVERDUE";
+export type PaymentStatus = "PENDING" | "PARTIAL" | "PAID" | "OVERDUE";
 
 export type DiscountType = "PERCENTAGE" | "FIXED";
 
@@ -35,19 +31,23 @@ export interface InvoiceCustomer {
 export interface InvoiceItem {
   id?: string;
   itemId?: string | null;
+  productId?: string | null;
   itemName?: string | null;
+  productName?: string | null;
+  itemCode?: string | null;
   description?: string | null;
   hsnSac?: string | null;
+  hsnSacCode?: string | null;
   unit?: string | null;
+  classification?: "GOODS" | "SERVICES" | null;
   quantity: number;
-  /** Unit price */
   price?: number;
-  /** Alias of price (API / legacy) */
   rate?: number;
   discount?: number;
+  discountValue?: number;
   discountType?: DiscountType;
-  /** Combined GST rate % — split into CGST/SGST or IGST by taxType */
   taxRate?: number;
+  gstRate?: number;
   taxAmount?: number;
   cgstRate?: number;
   cgstAmount?: number;
@@ -55,64 +55,73 @@ export interface InvoiceItem {
   sgstAmount?: number;
   igstRate?: number;
   igstAmount?: number;
-  /** Line total after discount + tax */
   total?: number;
-  /** Alias of total (API / legacy) */
   amount?: number;
+  taxableAmount?: number;
   stockAvailable?: number | null;
 }
 
 export interface Invoice {
   id: string;
-  tenantId: string;
-  branchId?: string | null;
   invoiceNumber?: string | null;
   invoiceDate: string;
-  dueDate?: string | null;
   financialYear?: string | null;
   invoiceStatus: InvoiceStatus;
   invoiceType?: InvoiceType | null;
 
-  businessName: string;
-  businessLegalName?: string | null;
-  businessGSTIN?: string | null;
-  businessPAN?: string | null;
-  businessPhone?: string | null;
-  businessEmail?: string | null;
-  businessAddressLine1?: string | null;
-  businessAddressLine2?: string | null;
-  businessCity?: string | null;
-  businessState?: string | null;
-  businessStateCode?: string | null;
-  businessPincode?: string | null;
-  businessCountry: string;
+  // Seller (issuer)
+  sellerTradeName?: string | null;
+  sellerLegalName?: string | null;
+  sellerGSTIN?: string | null;
+  sellerPAN?: string | null;
+  sellerPhone?: string | null;
+  sellerEmail?: string | null;
+  sellerAddressLine1?: string | null;
+  sellerAddressLine2?: string | null;
+  sellerCity?: string | null;
+  sellerState?: string | null;
+  sellerStateCode?: string | null;
+  sellerPincode?: string | null;
+  sellerCountry?: string | null;
 
+  sellerBankName?: string | null;
+  sellerBankAccountNumber?: string | null;
+  sellerBankIFSC?: string | null;
+  sellerBankBranch?: string | null;
+  sellerUPIId?: string | null;
 
-businessBankName?: string | null;
-businessBankAccountNumber?: string | null;
-businessBankIFSC?: string | null;
-businessBankBranch?: string | null;
-businessUPIId?: string | null;
+  showBankDetails?: boolean;
+  showUPIDetails?: boolean;
 
-showBankDetails: boolean;
-showUPIDetails: boolean;
-
-  prospectName: string;
-  prospectCompanyName?: string | null;
-  prospectGSTIN?: string | null;
-  prospectPAN?: string | null;
-  prospectPhone?: string | null;
-  prospectEmail?: string | null;
-  prospectAddressLine1?: string | null;
-  prospectAddressLine2?: string | null;
-  prospectCity?: string | null;
-  prospectState?: string | null;
-  prospectStateCode?: string | null;
-  prospectPincode?: string | null;
-  prospectCountry: string;
-
-  customerId?: string | null;
+  // Buyer (customer)
   customer?: InvoiceCustomer | null;
+  buyerName: string;
+  buyerCompanyName?: string | null;
+  buyerGSTIN?: string | null;
+  buyerPAN?: string | null;
+  buyerPhone?: string | null;
+  buyerEmail?: string | null;
+  buyerType?: string | null;
+  buyerContactPerson?: string | null;
+
+  // Billing
+  billingAddressLine1?: string | null;
+  billingAddressLine2?: string | null;
+  billingCity?: string | null;
+  billingState?: string | null;
+  billingStateCode?: string | null;
+  billingPincode?: string | null;
+  billingCountry?: string | null;
+
+  // Shipping
+  sameAsBilling?: boolean;
+  shippingAddressLine1?: string | null;
+  shippingAddressLine2?: string | null;
+  shippingCity?: string | null;
+  shippingState?: string | null;
+  shippingStateCode?: string | null;
+  shippingPincode?: string | null;
+  shippingCountry?: string | null;
 
   placeOfSupply?: string | null;
   placeOfSupplyCode?: string | null;
@@ -134,29 +143,23 @@ showUPIDetails: boolean;
   roundOffAmount: number;
   grandTotal: number;
 
-  acceptedAt?: string | null;
-  acceptedBy?: string | null;
-  rejectedAt?: string | null;
-  rejectedBy?: string | null;
-  rejectionReason?: string | null;
-
   paymentStatus?: PaymentStatus | null;
   paymentMethod?: string | null;
   paidAmount?: number | null;
+  pendingAmount?: number | null;
   paymentDate?: string | null;
   transactionId?: string | null;
+  receivedAccount?: string | null;
 
   notes?: string | null;
   termsAndConditions?: string | null;
   signature?: string | null;
-  printCount: number;
+  printCount?: number;
+
   items: InvoiceItem[];
 
-  createdBy: string;
-  updatedBy?: string | null;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface InvoiceListParams {
@@ -164,7 +167,6 @@ export interface InvoiceListParams {
   limit?: number;
   search?: string;
   status?: InvoiceStatus;
-  customerId?: string;
   branchId?: string;
   financialYear?: string;
   fromDate?: string;
@@ -193,54 +195,38 @@ export interface InvoiceResponse {
   data: Invoice;
 }
 
+/** Create payload — never include tenantId / createdBy / businessId (backend auth) */
 export interface InvoiceCreatePayload {
-  /** @deprecated never send — backend auth */
-  tenantId?: string;
-  /** @deprecated never send — backend auth */
-  branchId?: string | null;
+  invoiceType?: InvoiceType;
   invoiceDate: string;
-  dueDate?: string | null;
   financialYear?: string | null;
+  invoiceStatus?: InvoiceStatus;
+  status?: InvoiceStatus;
 
-  businessName: string;
-  businessLegalName?: string | null;
-  businessGSTIN?: string | null;
-  businessPAN?: string | null;
-  businessPhone?: string | null;
-  businessEmail?: string | null;
-  businessAddressLine1?: string | null;
-  businessAddressLine2?: string | null;
-  businessCity?: string | null;
-  businessState?: string | null;
-  businessStateCode?: string | null;
-  businessPincode?: string | null;
-  businessCountry?: string;
+  buyerName: string;
+  buyerCompanyName?: string | null;
+  buyerGSTIN?: string | null;
+  buyerPAN?: string | null;
+  buyerPhone?: string | null;
+  buyerEmail?: string | null;
 
+  billingAddressLine1?: string | null;
+  billingAddressLine2?: string | null;
+  billingCity?: string | null;
+  billingState?: string | null;
+  billingStateCode?: string | null;
+  billingPincode?: string | null;
+  billingCountry?: string | null;
 
-businessBankName?: string | null;
-businessBankAccountNumber?: string | null;
-businessBankIFSC?: string | null;
-businessBankBranch?: string | null;
-businessUPIId?: string | null;
+  sameAsBilling?: boolean;
+  shippingAddressLine1?: string | null;
+  shippingAddressLine2?: string | null;
+  shippingCity?: string | null;
+  shippingState?: string | null;
+  shippingStateCode?: string | null;
+  shippingPincode?: string | null;
+  shippingCountry?: string | null;
 
-showBankDetails?: boolean;
-showUPIDetails?: boolean;
-
-  prospectName: string;
-  prospectCompanyName?: string | null;
-  prospectGSTIN?: string | null;
-  prospectPAN?: string | null;
-  prospectPhone?: string | null;
-  prospectEmail?: string | null;
-  prospectAddressLine1?: string | null;
-  prospectAddressLine2?: string | null;
-  prospectCity?: string | null;
-  prospectState?: string | null;
-  prospectStateCode?: string | null;
-  prospectPincode?: string | null;
-  prospectCountry?: string;
-
-  customerId?: string | null;
   placeOfSupply?: string | null;
   placeOfSupplyCode?: string | null;
   taxType?: TaxType | null;
@@ -248,12 +234,9 @@ showUPIDetails?: boolean;
   isExport?: boolean;
   isSEZ?: boolean;
   currency?: string;
-  exchangeRate?: number | null;
 
   items: InvoiceItem[];
 
-  totalItems?: number;
-  totalQuantity?: number;
   taxableAmount?: number;
   discountAmount?: number;
   cgstAmount?: number;
@@ -263,21 +246,23 @@ showUPIDetails?: boolean;
   roundOffAmount?: number;
   grandTotal?: number;
 
+  paymentStatus?: PaymentStatus | null;
+  paymentMethod?: string | null;
+  paidAmount?: number | null;
+  paymentDate?: string | null;
+  transactionId?: string | null;
+
+  showBankDetails?: boolean;
+  showUPIDetails?: boolean;
+
   notes?: string | null;
   termsAndConditions?: string | null;
   signature?: string | null;
-  status?: InvoiceStatus;
-  /** @deprecated never send — backend auth */
-  createdBy?: string;
 }
 
-export interface InvoiceUpdatePayload
-  extends Partial<Omit<InvoiceCreatePayload, "tenantId" | "createdBy">> {
-  updatedBy?: string;
-}
+export type InvoiceUpdatePayload = Partial<InvoiceCreatePayload>;
 
-/** PATCH /invoices/:id/status */
 export interface InvoiceStatusChangePayload {
-  status: InvoiceStatus;
+  status: string;
   remarks?: string;
 }

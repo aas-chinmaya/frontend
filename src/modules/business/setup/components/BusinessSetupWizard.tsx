@@ -44,6 +44,7 @@ export default function BusinessSetupWizard({
     goBack,
     goToStep,
     submit,
+    skip,
   } = useBusinessSetup({
     initialValues,
     initialBusinessId,
@@ -105,35 +106,48 @@ export default function BusinessSetupWizard({
                 Progress saved automatically
               </div>
 
-              {isLastStep ? (
-                <Button
-                  type="button"
-                  onClick={submit}
-                  disabled={submitting}
-                  className="min-w-[160px] rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="h-4 w-4" />
-                      Complete Setup
-                    </>
-                  )}
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  onClick={goNext}
-                  className="min-w-[116px] rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
-                >
-                  Submit
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              )}
+              <div className="flex items-center gap-3">
+                {stepIndex === 1 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={skip}
+                    disabled={submitting}
+                    className="rounded-lg border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+                  >
+                    Skip
+                  </Button>
+                )}
+                {isLastStep ? (
+                  <Button
+                    type="button"
+                    onClick={submit}
+                    disabled={submitting}
+                    className="min-w-[160px] rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="h-4 w-4" />
+                        Complete Setup
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={goNext}
+                    className="min-w-[116px] rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
+                  >
+                    Submit
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </div>

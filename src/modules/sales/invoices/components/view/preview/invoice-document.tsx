@@ -14,13 +14,13 @@ const STATUS_BADGE: Record<
   InvoiceStatus,
   { className: string; label: string }
 > = {
-  FINALIZED: { className: "bg-indigo-100 text-indigo-800", label: "Finalized" },
-  DRAFT: { className: "bg-[var(--neutral)]", label: "Draft" },
-  SENT: { className: "bg-[var(--info)]", label: "Sent" },
-  PAID: { className: "bg-[var(--success)]", label: "Paid" },
-  OVERDUE: { className: "bg-[var(--danger)]", label: "Overdue" },
-  CANCELLED: { className: "bg-[var(--danger)]", label: "Cancelled" },
-  PARTIALLY_PAID: { className: "bg-[var(--warning)]", label: "Partially Paid" },
+  DRAFT: { className: "bg-ink-muted", label: "Draft" },
+  FINALIZED: { className: "bg-accent", label: "Finalized" },
+  SENT: { className: "bg-accent", label: "Sent" },
+  PAID: { className: "bg-add", label: "Paid" },
+  PARTIALLY_PAID: { className: "bg-accent", label: "Partially Paid" },
+  OVERDUE: { className: "bg-remove", label: "Overdue" },
+  CANCELLED: { className: "bg-remove", label: "Cancelled" },
 };
 
 function formatDate(value?: string | null) {
@@ -65,21 +65,21 @@ export function InvoiceDocument({ invoice }: InvoiceDocumentProps) {
   const badge = STATUS_BADGE[status] ?? STATUS_BADGE.DRAFT;
 
   const businessAddress = formatAddress([
-    invoice.businessAddressLine1,
-    invoice.businessAddressLine2,
-    invoice.businessCity,
-    invoice.businessState,
-    invoice.businessCountry,
-    invoice.businessPincode ? `- ${invoice.businessPincode}` : null,
+    invoice.sellerAddressLine1,
+    invoice.sellerAddressLine2,
+    invoice.sellerCity,
+    invoice.sellerState,
+    invoice.sellerCountry,
+    invoice.sellerPincode ? `- ${invoice.sellerPincode}` : null,
   ]);
 
   const prospectAddress = formatAddress([
-    invoice.prospectAddressLine1,
-    invoice.prospectAddressLine2,
-    invoice.prospectCity,
-    invoice.prospectState,
-    invoice.prospectCountry,
-    invoice.prospectPincode ? `- ${invoice.prospectPincode}` : null,
+    invoice.billingAddressLine1,
+    invoice.billingAddressLine2,
+    invoice.billingCity,
+    invoice.billingState,
+    invoice.billingCountry,
+    invoice.billingPincode ? `- ${invoice.billingPincode}` : null,
   ]);
 
   const placeOfSupply =
@@ -87,8 +87,8 @@ export function InvoiceDocument({ invoice }: InvoiceDocumentProps) {
       ? `${invoice.placeOfSupply} (${invoice.placeOfSupplyCode})`
       : invoice.placeOfSupply || "—";
 
-  const prospectTitle =
-    invoice.prospectCompanyName || invoice.prospectName || "—";
+  const buyerTitle =
+    invoice.buyerCompanyName || invoice.buyerName || "—";
 
   return (
     <div
@@ -130,16 +130,9 @@ export function InvoiceDocument({ invoice }: InvoiceDocumentProps) {
               value={formatDate(invoice.invoiceDate)}
               bold
             />
-            {invoice.dueDate ? (
-              <InfoRow
-                label="Due Date"
-                value={formatDate(invoice.dueDate)}
-                bold
-              />
-            ) : null}
             <InfoRow
               label="Country of Supply"
-              value={invoice.prospectCountry || "India"}
+              value={invoice.billingCountry || "India"}
               bold
             />
             <InfoRow label="Place of Supply" value={placeOfSupply} bold />
@@ -151,34 +144,34 @@ export function InvoiceDocument({ invoice }: InvoiceDocumentProps) {
               Invoice From
             </div>
             <div className="mt-1 text-[12px] font-bold text-slate-800 sm:text-[13px]">
-              {invoice.businessLegalName || invoice.businessName}
+              {invoice.sellerLegalName || invoice.sellerTradeName}
             </div>
             {businessAddress && (
               <div className="mt-1 max-w-full text-[10px] leading-[1.45] text-slate-700 sm:max-w-[290px] sm:text-[11px]">
                 {businessAddress}
               </div>
             )}
-            {invoice.businessGSTIN && (
+            {invoice.sellerGSTIN && (
               <div className="mt-2 text-[10px] text-slate-700 sm:text-[11px]">
                 <span className="font-medium">GSTIN:</span>{" "}
-                {invoice.businessGSTIN}
+                {invoice.sellerGSTIN}
               </div>
             )}
-            {invoice.businessPAN && (
+            {invoice.sellerPAN && (
               <div className="mt-1 text-[10px] text-slate-700 sm:text-[11px]">
-                <span className="font-medium">PAN:</span> {invoice.businessPAN}
+                <span className="font-medium">PAN:</span> {invoice.sellerPAN}
               </div>
             )}
-            {invoice.businessEmail && (
+            {invoice.sellerEmail && (
               <div className="mt-1 break-all text-[10px] text-slate-700 sm:text-[11px]">
                 <span className="font-medium">Email:</span>{" "}
-                {invoice.businessEmail}
+                {invoice.sellerEmail}
               </div>
             )}
-            {invoice.businessPhone && (
+            {invoice.sellerPhone && (
               <div className="mt-1 text-[10px] text-slate-700 sm:text-[11px]">
                 <span className="font-medium">Phone:</span>{" "}
-                {invoice.businessPhone}
+                {invoice.sellerPhone}
               </div>
             )}
           </div>
@@ -189,11 +182,11 @@ export function InvoiceDocument({ invoice }: InvoiceDocumentProps) {
               Invoice For
             </div>
             <div className="mt-1 text-[12px] font-bold text-slate-800 sm:text-[13px]">
-              {prospectTitle}
+              {buyerTitle}
             </div>
-            {invoice.prospectName && invoice.prospectCompanyName && (
+            {invoice.buyerName && invoice.buyerCompanyName && (
               <div className="mt-0.5 text-[10px] text-slate-600 sm:text-[11px]">
-                Attn: {invoice.prospectName}
+                Attn: {invoice.buyerName}
               </div>
             )}
             {prospectAddress && (
@@ -201,78 +194,53 @@ export function InvoiceDocument({ invoice }: InvoiceDocumentProps) {
                 {prospectAddress}
               </div>
             )}
-            {invoice.prospectGSTIN && (
+            {invoice.buyerGSTIN && (
               <div className="mt-2 text-[10px] text-slate-700 sm:text-[11px]">
                 <span className="font-medium">GSTIN:</span>{" "}
-                {invoice.prospectGSTIN}
+                {invoice.buyerGSTIN}
               </div>
             )}
-            {invoice.prospectPAN && (
+            {invoice.buyerPAN && (
               <div className="mt-1 text-[10px] text-slate-700 sm:text-[11px]">
-                <span className="font-medium">PAN:</span> {invoice.prospectPAN}
+                <span className="font-medium">PAN:</span> {invoice.buyerPAN}
               </div>
             )}
-            {invoice.prospectEmail && (
+            {invoice.buyerEmail && (
               <div className="mt-1 break-all text-[10px] text-slate-700 sm:text-[11px]">
                 <span className="font-medium">Email:</span>{" "}
-                {invoice.prospectEmail}
+                {invoice.buyerEmail}
               </div>
             )}
-            {invoice.prospectPhone && (
+            {invoice.buyerPhone && (
               <div className="mt-1 text-[10px] text-slate-700 sm:text-[11px]">
                 <span className="font-medium">Phone:</span>{" "}
-                {invoice.prospectPhone}
+                {invoice.buyerPhone}
               </div>
             )}
           </div>
         </div>
 
-        {/* Items */}
+        {/* Items — horizontal scroll on small screens */}
         <div className="w-full min-w-0">
           <div className="min-w-0">
             <InvoiceItemsTable
               items={invoice.items || []}
               taxType={invoice.taxType}
             />
-            <InvoiceSummary
-              invoice={invoice}
-              showBank={!!invoice.showBankDetails}
-              showUpi={!!invoice.showUPIDetails}
-              bank={
-                invoice.showBankDetails
-                  ? {
-                      accountName:
-                        invoice.businessLegalName ||
-                        invoice.businessName ||
-                        "—",
-                      bankName: invoice.businessBankName || "—",
-                      accountNumber:
-                        invoice.businessBankAccountNumber || "—",
-                      ifsc: invoice.businessBankIFSC || "—",
-                    }
-                  : undefined
-              }
-              upi={
-                invoice.showUPIDetails
-                  ? {
-                      upiId: invoice.businessUPIId || "—",
-                      linkedBank: invoice.businessBankName || undefined,
-                    }
-                  : undefined
-              }
-            />
+            <InvoiceSummary invoice={invoice} />
           </div>
         </div>
 
         <InvoiceSignature
-          amountInWords={amountInWords(invoice.grandTotal)}
-        />
+amountInWords={amountInWords(invoice.grandTotal)} />
       </div>
 
       <InvoiceTerms
         termsAndConditions={invoice.termsAndConditions}
         notes={invoice.notes}
       />
+
+     
     </div>
   );
 }

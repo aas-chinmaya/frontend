@@ -446,62 +446,79 @@ export default function BusinessDetails({ businessId, mode = "dashboard" }: Busi
             <EmptyState icon={Building2} title="No branches added" description="Branch information will appear here once branches are configured." />
           ) : (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              {business.branches.map((branch: any, index: number) => (
-                <article key={branch.id ?? index} className="group rounded-xl border border-border bg-white p-5 transition hover:border-primary/25 hover:shadow-sm">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex min-w-0 items-start gap-3">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                        <Building2 className="h-5 w-5" />
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-base font-semibold text-text">{branch.branchName || "Branch"}</p>
-                        {branch.branchCode && <p className="mt-1 text-xs text-muted">Code: {branch.branchCode}</p>}
-                      </div>
-                    </div>
-                    <StatusBadge status={branch.status} />
-                  </div>
+              {business.branches.map((branch: any, index: number) => {
+                const branchUsers = Array.isArray(branch.users) ? branch.users : [];
+                const managerName =
+                  branch.branchManager ||
+                  branch.user?.fullName ||
+                  branch.user?.name ||
+                  branchUsers[0]?.fullName ||
+                  branchUsers[0]?.name ||
+                  "Not assigned";
+                const userSummary = branchUsers.length
+                  ? branchUsers
+                      .map((user: any) => user.fullName || user.name || user.email || "User")
+                      .filter(Boolean)
+                      .join(", ")
+                  : managerName;
 
-                  <Separator className="my-4" />
-
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="flex min-w-0 items-start gap-2.5">
-                      <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Location</p>
-                        <p className="mt-1 text-sm text-text">{locationLabel(branch)}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex min-w-0 items-start gap-2.5">
-                      <User className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Manager</p>
-                        <p className="mt-1 text-sm text-text">{branch.branchManager || "Not assigned"}</p>
-                      </div>
-                    </div>
-
-                    {branch.phone && (
-                      <div className="flex min-w-0 items-start gap-2.5">
-                        <Phone className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                return (
+                  <article key={branch.id ?? index} className="group rounded-xl border border-border bg-white p-5 transition hover:border-primary/25 hover:shadow-sm">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                          <Building2 className="h-5 w-5" />
+                        </span>
                         <div className="min-w-0">
-                          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Phone</p>
-                          <p className="mt-1 text-sm text-text">{branch.phone}</p>
+                          <p className="text-base font-semibold text-text">{branch.branchName || branch.name || "Branch"}</p>
+                          {branch.branchCode && <p className="mt-1 text-xs text-muted">Code: {branch.branchCode}</p>}
                         </div>
                       </div>
-                    )}
+                      <StatusBadge status={branch.status} />
+                    </div>
 
-                    {branch.email && (
+                    <Separator className="my-4" />
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div className="flex min-w-0 items-start gap-2.5">
-                        <Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                         <div className="min-w-0">
-                          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Email</p>
-                          <p className="mt-1 text-sm text-text">{branch.email}</p>
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Location</p>
+                          <p className="mt-1 text-sm text-text">{locationLabel(branch)}</p>
                         </div>
                       </div>
-                    )}
-                  </div>
-                </article>
-              ))}
+
+                      <div className="flex min-w-0 items-start gap-2.5">
+                        <User className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Users</p>
+                          <p className="mt-1 text-sm text-text">{userSummary}</p>
+                        </div>
+                      </div>
+
+                      {branch.phone && (
+                        <div className="flex min-w-0 items-start gap-2.5">
+                          <Phone className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Phone</p>
+                            <p className="mt-1 text-sm text-text">{branch.phone}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {branch.email && (
+                        <div className="flex min-w-0 items-start gap-2.5">
+                          <Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Email</p>
+                            <p className="mt-1 text-sm text-text">{branch.email}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
         </SectionCard>

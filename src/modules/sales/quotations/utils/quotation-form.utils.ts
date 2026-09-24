@@ -378,7 +378,6 @@ showUPIDetails: false,
     prospectPincode: "",
     prospectCountry: "India",
 
-    customerId: null,
     placeOfSupply: "",
     placeOfSupplyCode: null,
     taxType: "INTRA_STATE",
@@ -457,7 +456,6 @@ showUPIDetails: q.showUPIDetails ?? false,
     prospectPincode: q.prospectPincode ?? "",
     prospectCountry: q.prospectCountry ?? "India",
 
-    customerId: q.customerId ?? null,
     placeOfSupply: q.placeOfSupply ?? "",
     placeOfSupplyCode: q.placeOfSupplyCode ?? null,
     taxType: q.taxType ?? "INTRA_STATE",
@@ -723,7 +721,6 @@ return {
   prospectCountry:
     rest.prospectCountry || "India",
 
-  customerId: rest.customerId || null,
   placeOfSupply: rest.placeOfSupply || null,
   placeOfSupplyCode:
     rest.placeOfSupplyCode || null,

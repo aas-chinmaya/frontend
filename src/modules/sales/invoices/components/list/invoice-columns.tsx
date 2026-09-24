@@ -67,7 +67,7 @@ export const InvoiceColumns: ColumnDef<Invoice>[] =
             </p>
 
             <p className="text-xs text-muted-foreground">
-              {invoice.prospectName ??
+              {invoice.buyerName ??
                 "No customer"}
             </p>
           </div>
@@ -95,27 +95,6 @@ export const InvoiceColumns: ColumnDef<Invoice>[] =
       ),
     },
 
-    // ========================================================
-    // DUE DATE
-    // ========================================================
-
-    {
-      accessorKey:
-        "dueDate",
-
-      header: "Due Date",
-
-      cell: ({ row }) => (
-        <span>
-          {formatDate(
-            row.original
-              .dueDate,
-          )}
-        </span>
-      ),
-    },
-
-   
 
     // ========================================================
     // TOTAL

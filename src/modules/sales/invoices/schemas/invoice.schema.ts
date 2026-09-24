@@ -12,8 +12,8 @@ export const invoiceStatusSchema = z.enum([
 
 export const taxTypeSchema = z.enum(["INTRA_STATE", "INTER_STATE"]);
 export const discountTypeSchema = z.enum(["PERCENTAGE", "FIXED"]);
+export const invoiceTypeSchema = z.enum(["B2B", "B2C", "EXPORT", "SEZ"]);
 
-/** Production limits — Indian commercial sanity */
 export const LIMITS = {
   NAME: 200,
   COMPANY: 200,
@@ -26,16 +26,12 @@ export const LIMITS = {
   PAN: 10,
   HSN: 12,
   UNIT: 20,
-  NOTES_HTML: 10000,
-  /** Max unit price (₹) — 10 crore */
+  NOTES_HTML: 500,
+  TERMS_HTML: 2000,
   MAX_PRICE: 10_00_00_000,
-  /** Max quantity per line */
   MAX_QTY: 1_00_000,
-  /** Max discount % */
   MAX_DISC_PCT: 100,
-  /** Max tax rate % */
   MAX_TAX: 40,
-  /** Max grand total sanity */
   MAX_TOTAL: 100_00_00_000,
 } as const;
 
@@ -54,10 +50,7 @@ function stripControl(s: string) {
 
 function noHarmful(val: string, ctx: z.RefinementCtx) {
   if (SAFE_TEXT_RE.test(val)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Invalid content",
-    });
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid content" });
   }
 }
 
@@ -65,8 +58,6 @@ const optionalEmail = z
   .union([z.string().email("Invalid email"), z.literal(""), z.null()])
   .optional()
   .transform((v) => (v === "" || v === undefined ? null : v));
-
-
 
 const phoneRequired = z
   .string()
@@ -78,34 +69,10 @@ const phoneRequired = z
     "Enter phone with country code (e.g. +919876543210)",
   );
 
-
 const pincodeRequired = z
   .string()
   .min(1, "Pincode is required")
   .regex(/^[0-9]{6}$/, "Pincode must be 6 digits");
-
-const pincodeSchema = z
-  .union([
-    z.literal(""),
-    z.null(),
-    z
-      .string()
-      .regex(/^[0-9]{6}$/, "Pincode must be 6 digits"),
-  ])
-  .optional()
-  .nullable();
-
-
-
-const safeText = (max: number, requiredMsg?: string) => {
-  let s = z.string().max(max, `Max ${max} characters`);
-  if (requiredMsg) {
-    s = s.min(1, requiredMsg) as typeof s;
-  }
-  return s
-    .transform((v) => stripControl(v))
-    .superRefine((v, ctx) => noHarmful(v, ctx));
-};
 
 const optionalSafeText = (max: number) =>
   z
@@ -119,150 +86,84 @@ const optionalSafeText = (max: number) =>
       if (typeof v === "string") noHarmful(v, ctx);
     });
 
+const safeText = (max: number, requiredMsg?: string) => {
+  let s = z.string().max(max, `Max ${max} characters`);
+  if (requiredMsg) s = s.min(1, requiredMsg) as typeof s;
+  return s
+    .transform((v) => stripControl(v))
+    .superRefine((v, ctx) => noHarmful(v, ctx));
+};
+
 const money = (label: string, max = LIMITS.MAX_PRICE) =>
   z.coerce
     .number()
     .nonnegative(`${label} cannot be negative`)
     .max(max, `${label} exceeds allowed limit`);
 
-export const invoiceItemSchema = z
-  .object({
-    id: z.string().optional(),
-    itemId: z.string().nullable().optional(),
-    itemName: z
-      .string()
-      .max(LIMITS.NAME)
-      .optional()
-      .default("")
-      .transform((v) => stripControl(String(v || "")).slice(0, LIMITS.NAME))
-      .superRefine((v, ctx) => noHarmful(v, ctx)),
-    description: optionalSafeText(LIMITS.DESCRIPTION),
-    hsnSac: optionalSafeText(LIMITS.HSN),
-    quantity: z.coerce
-      .number()
-      .min(0, "Quantity cannot be negative")
-      .max(LIMITS.MAX_QTY, `Quantity max ${LIMITS.MAX_QTY}`),
-    unit: optionalSafeText(LIMITS.UNIT),
-    rate: money("Rate").optional().default(0),
-    price: money("Price").optional().default(0),
-    discount: z.coerce
-      .number()
-      .nonnegative("Discount cannot be negative")
-      .max(LIMITS.MAX_PRICE, "Discount too large")
-      .optional()
-      .default(0),
-    discountType: discountTypeSchema.optional().default("PERCENTAGE"),
-    taxRate: z.coerce
-      .number()
-      .min(0)
-      .max(LIMITS.MAX_TAX, `Tax rate max ${LIMITS.MAX_TAX}%`)
-      .optional()
-      .default(0),
-    taxAmount: z.coerce.number().nonnegative().optional().default(0),
-    cgstRate: z.coerce.number().nonnegative().optional().default(0),
-    cgstAmount: z.coerce.number().nonnegative().optional().default(0),
-    sgstRate: z.coerce.number().nonnegative().optional().default(0),
-    sgstAmount: z.coerce.number().nonnegative().optional().default(0),
-    igstRate: z.coerce.number().nonnegative().optional().default(0),
-    igstAmount: z.coerce.number().nonnegative().optional().default(0),
-    amount: z.coerce.number().nonnegative().optional().default(0),
-    total: z.coerce.number().nonnegative().optional().default(0),
-    /** Available stock — invoice validates qty */
-    stockAvailable: z.number().nullable().optional(),
-  })
-  .superRefine((item, ctx) => {
-    const qty = Number(item.quantity) || 0;
-    const price = (Number(item.price ?? item.rate) || 0);
-    const disc = Number(item.discount) || 0;
-    const dtype = item.discountType || "PERCENTAGE";
-
-    if (dtype === "PERCENTAGE" && disc > LIMITS.MAX_DISC_PCT) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `Discount cannot exceed ${LIMITS.MAX_DISC_PCT}%`,
-        path: ["discount"],
-      });
-    }
-
-    if (dtype === "FIXED") {
-      const gross = qty * price;
-      if (disc > gross + 0.001) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Discount cannot exceed line amount",
-          path: ["discount"],
-        });
-      }
-    }
-
-    
-    if (
-      item.stockAvailable != null &&
-      item.stockAvailable >= 0 &&
-      qty > item.stockAvailable
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `Only ${item.stockAvailable} in stock`,
-        path: ["quantity"],
-      });
-    }
-
-    if (item.itemName && qty <= 0 && item.itemId) {
-      // allow 0 qty only for empty draft lines without selection
-    }
-  });
+export const invoiceItemSchema = z.object({
+  id: z.string().optional(),
+  itemId: z.string().nullable().optional(),
+  productId: z.string().optional(),
+  itemName: z.string().max(LIMITS.NAME).optional().default(""),
+  productName: z.string().max(LIMITS.NAME).optional(),
+  itemCode: z.string().optional(),
+  description: optionalSafeText(LIMITS.DESCRIPTION),
+  hsnSac: optionalSafeText(LIMITS.HSN),
+  hsnSacCode: optionalSafeText(LIMITS.HSN),
+  unit: optionalSafeText(LIMITS.UNIT),
+  classification: z.enum(["GOODS", "SERVICES"]).optional(),
+  quantity: z.coerce.number().min(0).max(LIMITS.MAX_QTY),
+  rate: money("Rate").optional().default(0),
+  price: money("Price").optional().default(0),
+  discount: z.coerce.number().nonnegative().optional().default(0),
+  discountValue: z.coerce.number().nonnegative().optional().default(0),
+  discountType: discountTypeSchema.optional().default("PERCENTAGE"),
+  taxRate: z.coerce.number().min(0).max(LIMITS.MAX_TAX).optional().default(0),
+  gstRate: z.coerce.number().min(0).max(LIMITS.MAX_TAX).optional(),
+  taxAmount: z.coerce.number().nonnegative().optional().default(0),
+  cgstRate: z.coerce.number().nonnegative().optional().default(0),
+  cgstAmount: z.coerce.number().nonnegative().optional().default(0),
+  sgstRate: z.coerce.number().nonnegative().optional().default(0),
+  sgstAmount: z.coerce.number().nonnegative().optional().default(0),
+  igstRate: z.coerce.number().nonnegative().optional().default(0),
+  igstAmount: z.coerce.number().nonnegative().optional().default(0),
+  amount: z.coerce.number().nonnegative().optional().default(0),
+  total: z.coerce.number().nonnegative().optional().default(0),
+  taxableAmount: z.coerce.number().nonnegative().optional().default(0),
+  stockAvailable: z.number().nullable().optional(),
+});
 
 export const invoiceBaseSchema = z.object({
-  tenantId: z.string().optional(), // never sent — backend auth
-  createdBy: z.string().optional(), // never sent — backend auth
-  branchId: z.string().optional().nullable(), // never sent — backend auth
-
+  invoiceType: invoiceTypeSchema.optional().default("B2B"),
   invoiceDate: z.string().min(1, "Invoice date is required"),
-  /** Optional — invoices do not require a due date */
-  dueDate: z.string().optional().nullable(),
   financialYear: optionalSafeText(20),
 
-  invoiceType: z.enum(["B2B", "B2C", "EXPORT", "SEZ"]).optional().default("B2B"),
+  buyerName: safeText(LIMITS.NAME, "Customer name is required"),
+  buyerCompanyName: optionalSafeText(LIMITS.COMPANY),
+  buyerGSTIN: optionalSafeText(LIMITS.GSTIN),
+  buyerPAN: optionalSafeText(LIMITS.PAN),
+  buyerPhone: phoneRequired,
+  buyerEmail: optionalEmail,
+  buyerType: optionalSafeText(50),
+  buyerContactPerson: optionalSafeText(LIMITS.NAME),
 
-  businessName: safeText(LIMITS.COMPANY, "Business name is required"),
-  businessLegalName: optionalSafeText(LIMITS.COMPANY),
-  businessGSTIN: optionalSafeText(LIMITS.GSTIN),
-  businessPAN: optionalSafeText(LIMITS.PAN),
-  businessPhone: optionalSafeText(LIMITS.PHONE),
-  businessEmail: optionalEmail,
-  businessAddressLine1: optionalSafeText(LIMITS.ADDRESS),
-  businessAddressLine2: optionalSafeText(LIMITS.ADDRESS),
-  businessCity: optionalSafeText(LIMITS.CITY),
-  businessState: optionalSafeText(LIMITS.CITY),
-  businessStateCode: optionalSafeText(10),
-  businessPincode: pincodeSchema,
-  businessCountry: optionalSafeText(LIMITS.CITY),
+  billingAddressLine1: safeText(LIMITS.ADDRESS, "Address is required"),
+  billingAddressLine2: optionalSafeText(LIMITS.ADDRESS),
+  billingCity: safeText(LIMITS.CITY, "City is required"),
+  billingState: safeText(LIMITS.CITY, "State is required"),
+  billingStateCode: optionalSafeText(10),
+  billingPincode: pincodeRequired,
+  billingCountry: safeText(LIMITS.CITY, "Country is required"),
 
-  businessBankName: optionalSafeText(LIMITS.COMPANY),
-  businessBankAccountNumber: optionalSafeText(40),
-  businessBankIFSC: optionalSafeText(20),
-  businessBankBranch: optionalSafeText(LIMITS.CITY),
-  businessUPIId: optionalSafeText(100),
-  showBankDetails: z.boolean().optional().default(false),
-  showUPIDetails: z.boolean().optional().default(false),
-  businessLogo: z.string().max(500_000).nullable().optional(),
+  sameAsBilling: z.boolean().optional().default(true),
+  shippingAddressLine1: optionalSafeText(LIMITS.ADDRESS),
+  shippingAddressLine2: optionalSafeText(LIMITS.ADDRESS),
+  shippingCity: optionalSafeText(LIMITS.CITY),
+  shippingState: optionalSafeText(LIMITS.CITY),
+  shippingStateCode: optionalSafeText(10),
+  shippingPincode: optionalSafeText(12),
+  shippingCountry: optionalSafeText(LIMITS.CITY),
 
-  prospectName: safeText(LIMITS.NAME, "Customer name is required"),
-  prospectCompanyName: optionalSafeText(LIMITS.COMPANY),
-  prospectGSTIN: optionalSafeText(LIMITS.GSTIN),
-  prospectPAN: optionalSafeText(LIMITS.PAN),
-  prospectPhone: phoneRequired,
-  prospectEmail: optionalEmail,
-  prospectAddressLine1: safeText(LIMITS.ADDRESS, "Address is required"),
-  prospectAddressLine2: optionalSafeText(LIMITS.ADDRESS),
-  prospectCity: safeText(LIMITS.CITY, "City is required"),
-  prospectState: safeText(LIMITS.CITY, "State is required"),
-  prospectStateCode: optionalSafeText(10),
-  prospectPincode: pincodeRequired,
-  prospectCountry: safeText(LIMITS.CITY, "Country is required"),
-
-  customerId: z.string().nullable().optional(),
   placeOfSupply: safeText(LIMITS.CITY, "Place of supply is required"),
   placeOfSupplyCode: optionalSafeText(10),
   taxType: taxTypeSchema.optional().default("INTRA_STATE"),
@@ -286,18 +187,49 @@ export const invoiceBaseSchema = z.object({
   grandTotal: z.coerce
     .number()
     .nonnegative()
-    .max(LIMITS.MAX_TOTAL, "Grand total exceeds limit")
+    .max(LIMITS.MAX_TOTAL)
     .default(0),
 
-  paymentStatus: z.enum(["PENDING", "PARTIAL", "PAID", "OVERDUE"]).optional().default("PENDING"),
+  paymentStatus: z
+    .enum(["PENDING", "PARTIAL", "PAID", "OVERDUE"])
+    .optional()
+    .default("PENDING"),
   paymentMethod: z.string().max(50).optional().nullable().default("Cash"),
   paidAmount: z.coerce.number().nonnegative().optional().default(0),
+  pendingAmount: z.coerce.number().nonnegative().optional().default(0),
   paymentDate: z.string().optional().nullable(),
   transactionId: z.string().max(100).optional().nullable(),
+  receivedAccount: z.string().max(100).optional().nullable(),
 
   notes: optionalSafeText(LIMITS.NOTES_HTML),
-  termsAndConditions: safeText(LIMITS.NOTES_HTML, "Terms & conditions are required"),
+  termsAndConditions: safeText(
+    LIMITS.TERMS_HTML,
+    "Terms & conditions are required",
+  ),
   signature: z.string().nullable().optional(),
+
+  sellerLegalName: optionalSafeText(LIMITS.COMPANY),
+  sellerTradeName: optionalSafeText(LIMITS.COMPANY),
+  sellerGSTIN: optionalSafeText(LIMITS.GSTIN),
+  sellerPAN: optionalSafeText(LIMITS.PAN),
+  sellerPhone: optionalSafeText(LIMITS.PHONE),
+  sellerEmail: optionalEmail,
+  sellerAddressLine1: optionalSafeText(LIMITS.ADDRESS),
+  sellerAddressLine2: optionalSafeText(LIMITS.ADDRESS),
+  sellerCity: optionalSafeText(LIMITS.CITY),
+  sellerState: optionalSafeText(LIMITS.CITY),
+  sellerStateCode: optionalSafeText(10),
+  sellerPincode: optionalSafeText(12),
+  sellerCountry: optionalSafeText(LIMITS.CITY),
+  sellerBankName: optionalSafeText(LIMITS.COMPANY),
+  sellerBankAccountNumber: optionalSafeText(40),
+  sellerBankIFSC: optionalSafeText(20),
+  sellerBankBranch: optionalSafeText(LIMITS.CITY),
+  sellerUPIId: optionalSafeText(100),
+  showBankDetails: z.boolean().optional().default(false),
+  showUPIDetails: z.boolean().optional().default(false),
+  businessLogo: z.string().max(500_000).nullable().optional(),
+
   status: invoiceStatusSchema.optional().default("DRAFT"),
 });
 
@@ -311,17 +243,17 @@ export const invoiceCreateSchema = invoiceBaseSchema.superRefine(
         path: ["termsAndConditions"],
       });
     }
-    const filledItems = (data.items || []).filter(
-      (it) => (it.itemName || "").trim().length > 0,
+    const filled = (data.items || []).filter(
+      (it) => (it.itemName || it.productName || "").trim().length > 0,
     );
-    if (filledItems.length === 0) {
+    if (filled.length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Add at least one item",
         path: ["items"],
       });
     }
-    for (const it of filledItems) {
+    for (const it of filled) {
       if (!it.quantity || Number(it.quantity) <= 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -331,40 +263,60 @@ export const invoiceCreateSchema = invoiceBaseSchema.superRefine(
         break;
       }
     }
-
-    if (data.dueDate && data.invoiceDate) {
-      const a = new Date(data.invoiceDate);
-      const b = new Date(data.dueDate);
-      if (
-        !Number.isNaN(a.getTime()) &&
-        !Number.isNaN(b.getTime()) &&
-        b < a
-      ) {
+    // Payment: PENDING → optional. PAID/PARTIAL/OVERDUE → method, paid amount, date required.
+    // Cash → transactionId optional; non-cash → transactionId required.
+    const status = String(data.paymentStatus || "PENDING").toUpperCase();
+    const needsPayment = status === "PAID" || status === "PARTIAL" || status === "OVERDUE";
+    if (needsPayment) {
+      const method = String(data.paymentMethod || "").trim();
+      if (!method) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Due date must be on or after invoice date",
-          path: ["dueDate"],
+          message: "Payment method is required",
+          path: ["paymentMethod"],
         });
       }
-    }
-
-    // Transaction / reference ID required when payment method is not Cash
-    const method = String(data.paymentMethod || "Cash").trim();
-    const isCash = method.toLowerCase() === "cash";
-    const tx = String(data.transactionId || "").trim();
-    if (!isCash && !tx) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Transaction / reference ID is required for non-cash payments",
-        path: ["transactionId"],
-      });
+      const paid = Number(data.paidAmount);
+      if (!Number.isFinite(paid) || paid < 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Paid amount is required",
+          path: ["paidAmount"],
+        });
+      }
+      if (!String(data.paymentDate || "").trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Payment date is required",
+          path: ["paymentDate"],
+        });
+      }
+      const isCash = method.toLowerCase() === "cash";
+      const tx = String(data.transactionId || "").trim();
+      if (!isCash && !tx) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Transaction / reference ID is required for non-cash payments",
+          path: ["transactionId"],
+        });
+      }
+    } else {
+      // PENDING: only enforce tx if user chose non-cash method
+      const method = String(data.paymentMethod || "Cash").trim();
+      const isCash = method.toLowerCase() === "cash";
+      const tx = String(data.transactionId || "").trim();
+      if (!isCash && method && !tx) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Transaction / reference ID is required for non-cash payments",
+          path: ["transactionId"],
+        });
+      }
     }
   },
 );
 
-export const invoiceUpdateSchema = invoiceBaseSchema.partial().extend({
-  updatedBy: z.string().optional(),
-});
+export const invoiceUpdateSchema = invoiceBaseSchema.partial();
 
 export type InvoiceCreateSchema = z.infer<typeof invoiceCreateSchema>;
 export type InvoiceUpdateSchema = z.infer<typeof invoiceUpdateSchema>;

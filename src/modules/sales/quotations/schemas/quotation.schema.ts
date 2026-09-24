@@ -26,7 +26,7 @@ export const LIMITS = {
   PAN: 10,
   HSN: 12,
   UNIT: 20,
-  NOTES_HTML: 10000,
+  NOTES_HTML: 500,
   /** Max unit price (₹) — 10 crore */
   MAX_PRICE: 10_00_00_000,
   /** Max quantity per line */
@@ -248,7 +248,6 @@ export const quotationBaseSchema = z.object({
   prospectPincode: pincodeRequired,
   prospectCountry: safeText(LIMITS.CITY, "Country is required"),
 
-  customerId: z.string().nullable().optional(),
   placeOfSupply: safeText(LIMITS.CITY, "Place of supply is required"),
   placeOfSupplyCode: optionalSafeText(10),
   taxType: taxTypeSchema.optional().default("INTRA_STATE"),

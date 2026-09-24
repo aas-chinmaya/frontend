@@ -92,25 +92,19 @@ export function InvoiceSummary() {
         <div className="space-y-4">
           <InvoicePaymentSection />
 
-          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-            <div className="px-4 py-3">
-              <Label className="text-sm font-semibold text-slate-800">
-                Internal notes
-              </Label>
-            </div>
-            <div className="border-t border-slate-100 px-4 py-3">
-              <Textarea
-                value={notes.replace(/<[^>]+>/g, "")}
-                onChange={(e) =>
-                  setValue("notes", e.target.value, {
-                    shouldDirty: true,
-                  })
-                }
-                placeholder="Internal remarks (not shown on PDF)…"
-                className="min-h-[120px] resize-y border-0 p-0 text-sm shadow-none focus-visible:ring-0"
-                maxLength={2000}
-              />
-            </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm text-slate-600">Internal notes</Label>
+            <Textarea
+              value={notes.replace(/<[^>]+>/g, "")}
+              onChange={(e) =>
+                setValue("notes", e.target.value, {
+                  shouldDirty: true,
+                })
+              }
+              placeholder="Internal remarks (not shown on PDF)…"
+              className="min-h-[120px] resize-y text-sm"
+              maxLength={2000}
+            />
           </div>
         </div>
 

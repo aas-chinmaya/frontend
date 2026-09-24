@@ -76,6 +76,7 @@ const DUMMY: BusinessContext = {
     upiId: "aasinternational@upi",
     branchId: "AASI-BR-001",
     branchName: "Bhubaneswar Head Office",
+    logo: null,
   },
 };
 

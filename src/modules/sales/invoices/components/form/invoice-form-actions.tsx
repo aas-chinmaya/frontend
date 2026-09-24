@@ -31,16 +31,16 @@ export function InvoiceFormActions({
 }: InvoiceFormActionsProps) {
   const { control } = useFormContext<InvoiceFormValues>();
 
-  const prospectName = useWatch({ control, name: "prospectName" });
-  const prospectPhone = useWatch({ control, name: "prospectPhone" });
-  const prospectAddressLine1 = useWatch({
+  const buyerName = useWatch({ control, name: "buyerName" });
+  const buyerPhone = useWatch({ control, name: "buyerPhone" });
+  const billingAddressLine1 = useWatch({
     control,
-    name: "prospectAddressLine1",
+    name: "billingAddressLine1",
   });
-  const prospectCity = useWatch({ control, name: "prospectCity" });
-  const prospectPincode = useWatch({ control, name: "prospectPincode" });
-  const prospectState = useWatch({ control, name: "prospectState" });
-  const prospectCountry = useWatch({ control, name: "prospectCountry" });
+  const billingCity = useWatch({ control, name: "billingCity" });
+  const billingPincode = useWatch({ control, name: "billingPincode" });
+  const billingState = useWatch({ control, name: "billingState" });
+  const billingCountry = useWatch({ control, name: "billingCountry" });
   const placeOfSupply = useWatch({ control, name: "placeOfSupply" });
   const invoiceDate = useWatch({ control, name: "invoiceDate" });
   const items = useWatch({ control, name: "items" });
@@ -54,13 +54,13 @@ export function InvoiceFormActions({
   const hasTerms = stripHtml(terms || "").length > 0;
 
   const customerOk =
-    !!(prospectName || "").trim() &&
-    !!(prospectPhone || "").trim() &&
-    !!(prospectAddressLine1 || "").trim() &&
-    !!(prospectCity || "").trim() &&
-    /^[0-9]{6}$/.test(String(prospectPincode || "")) &&
-    !!(prospectState || "").trim() &&
-    !!(prospectCountry || "").trim() &&
+    !!(buyerName || "").trim() &&
+    !!(buyerPhone || "").trim() &&
+    !!(billingAddressLine1 || "").trim() &&
+    !!(billingCity || "").trim() &&
+    /^[0-9]{6}$/.test(String(billingPincode || "")) &&
+    !!(billingState || "").trim() &&
+    !!(billingCountry || "").trim() &&
     !!(placeOfSupply || "").trim();
 
   const hasInvoiceDate = !!(invoiceDate || "").trim();
