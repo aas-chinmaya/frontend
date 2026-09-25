@@ -177,10 +177,7 @@ export interface QuotationResponse {
 }
 
 export interface QuotationCreatePayload {
-  /** @deprecated never send — backend auth */
-  tenantId?: string;
-  /** @deprecated never send — backend auth */
-  branchId?: string | null;
+
   quotationDate: string;
   validUntil: string;
   financialYear?: string | null;
@@ -249,8 +246,7 @@ showUPIDetails?: boolean;
   termsAndConditions?: string | null;
   signature?: string | null;
   status?: QuotationStatus;
-  /** @deprecated never send — backend auth */
-  createdBy?: string;
+  
 }
 
 export interface QuotationUpdatePayload

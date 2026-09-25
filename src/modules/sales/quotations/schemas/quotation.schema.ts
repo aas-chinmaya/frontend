@@ -203,9 +203,7 @@ export const quotationItemSchema = z
   });
 
 export const quotationBaseSchema = z.object({
-  tenantId: z.string().optional(), // never sent — backend auth
-  createdBy: z.string().optional(), // never sent — backend auth
-  branchId: z.string().optional().nullable(), // never sent — backend auth
+  
 
   quotationDate: z.string().min(1, "Quotation date is required"),
   validUntil: z.string().min(1, "Valid until is required"),

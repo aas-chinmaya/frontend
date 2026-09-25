@@ -331,13 +331,10 @@ export function resolveFinancialYear(dateStr?: string | null): string {
 }
 
 export function getDefaultQuotationValues(
-  tenantId = "",
-  createdBy = "",
+  
 ): QuotationFormValues {
   return {
-    tenantId,
-    createdBy,
-    branchId: null,
+  
     quotationDate: new Date().toISOString().slice(0, 10),
     validUntil: "",
     financialYear: resolveFinancialYear(new Date().toISOString()),
@@ -408,13 +405,10 @@ showUPIDetails: false,
 
 export function mapQuotationToFormValues(
   q: Quotation,
-  fallbacktenantId?: string,
-  fallbackCreatedBy?: string,
+ 
 ): QuotationFormValues {
   return {
-    tenantId: q.tenantId || fallbacktenantId || "",
-    createdBy: q.createdBy || fallbackCreatedBy || "",
-    branchId: q.branchId ?? null,
+   
     quotationDate: q.quotationDate?.slice(0, 10) ?? "",
     validUntil: q.validUntil?.slice(0, 10) ?? "",
     financialYear: resolveFinancialYear(q.quotationDate),
@@ -537,7 +531,6 @@ export function getSessionFormDefaults(session: {
   bankBranch?: string | null;
   upiId?: string | null;
 
-    branchId?: string | null;
   } | null;
 } | null): Partial<QuotationFormValues> {
   if (!session) return {};
@@ -547,10 +540,7 @@ export function getSessionFormDefaults(session: {
     business?.stateCode || getStateCode(business?.state || undefined) || null;
 
   return {
-    tenantId: business?.id ?? "",
-    createdBy: user?.id ?? "",
-    branchId: business?.branchId ?? null,
-    businessName: business?.name ?? "",
+  
     businessLegalName: business?.legalName ?? null,
     businessGSTIN: business?.gstin ?? null,
     businessPAN: business?.pan ?? null,
