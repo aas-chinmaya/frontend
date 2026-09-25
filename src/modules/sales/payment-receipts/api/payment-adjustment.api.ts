@@ -19,8 +19,8 @@ export const paymentAdjustmentApi = baseApi.injectEndpoints({
         data,
       }),
       invalidatesTags: (_result, _error, payload) => [
-        { type: "PaymentReceipt" as const, id: payload.paymentId },
-        { type: "PaymentAdjustment" as const, id: "LIST" },
+        { type: "PaymentReceipts" as const, id: payload.paymentId },
+        { type: "PaymentAdjustments" as const, id: "LIST" },
       ],
     }),
 
@@ -33,7 +33,7 @@ export const paymentAdjustmentApi = baseApi.injectEndpoints({
         method: "GET",
       }),
       providesTags: (_result, _error, id) => [
-        { type: "PaymentAdjustment" as const, id },
+        { type: "PaymentAdjustments" as const, id },
       ],
     }),
   }),

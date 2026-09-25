@@ -26,12 +26,12 @@ export const paymentReceiptApi = baseApi.injectEndpoints({
         result?.data?.length
           ? [
               ...result.data.map(({ id }) => ({
-                type: "PaymentReceipt" as const,
+                type: "PaymentReceipts" as const,
                 id,
               })),
-              { type: "PaymentReceipt" as const, id: "LIST" },
+              { type: "PaymentReceipts" as const, id: "LIST" },
             ]
-          : [{ type: "PaymentReceipt" as const, id: "LIST" }],
+          : [{ type: "PaymentReceipts" as const, id: "LIST" }],
     }),
 
     getPaymentReceiptById: builder.query<PaymentReceiptResponse, string>({
@@ -40,7 +40,7 @@ export const paymentReceiptApi = baseApi.injectEndpoints({
         method: "GET",
       }),
       providesTags: (_result, _error, id) => [
-        { type: "PaymentReceipt" as const, id },
+        { type: "PaymentReceipts" as const, id },
       ],
     }),
 
@@ -53,7 +53,7 @@ export const paymentReceiptApi = baseApi.injectEndpoints({
         method: "POST",
         data,
       }),
-      invalidatesTags: [{ type: "PaymentReceipt", id: "LIST" }],
+      invalidatesTags: [{ type: "PaymentReceipts", id: "LIST" }],
     }),
 
     updatePaymentReceipt: builder.mutation<
@@ -66,8 +66,8 @@ export const paymentReceiptApi = baseApi.injectEndpoints({
         data,
       }),
       invalidatesTags: (_result, _error, { id }) => [
-        { type: "PaymentReceipt", id },
-        { type: "PaymentReceipt", id: "LIST" },
+        { type: "PaymentReceipts", id },
+        { type: "PaymentReceipts", id: "LIST" },
       ],
     }),
   }),
