@@ -160,7 +160,7 @@ export function InvoiceCustomerFields() {
 
         <div className="space-y-1">
           <Label className="text-xs text-slate-600">
-            State <span className="text-red-500">*</span>
+             State / UT <span className="text-red-500">*</span>
           </Label>
           <Select
             value={stateValue(billingState)}

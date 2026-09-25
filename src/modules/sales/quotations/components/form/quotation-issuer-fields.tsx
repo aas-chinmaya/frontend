@@ -11,10 +11,11 @@ import {
   Phone,
   Smartphone,
   FileText,
+
+  Eye, EyeOff
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+
 import { FormField } from "@/modules/sales/shared/components/ui/form-field";
 import type { QuotationFormValues } from "../../types/quotation-form.types";
 
@@ -59,7 +60,12 @@ export function QuotationIssuerFields() {
       });
     reader.readAsDataURL(file);
   };
+const maskValue = (value?: string | null) => {
+  if (!value) return "—";
+  if (value.length <= 4) return "••••";
 
+  return `${value.slice(0, 1)}${"•".repeat(Math.max(value.length - 2, 3))}${value.slice(-1)}`;
+}; 
   return (
     <div className="space-y-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -139,52 +145,120 @@ export function QuotationIssuerFields() {
         </div>
       </div>
 
-      {/* Bank: toggle → details → UPI toggle → UPI details */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2.5">
-          <span className="flex items-center gap-2 text-xs font-medium text-slate-700">
-            <Landmark className="h-3.5 w-3.5" /> Show bank details on document
-          </span>
-          <Switch
-            checked={showBank}
-            disabled={!hasBank}
-            onCheckedChange={(v) =>
-              setValue("showBankDetails", v, { shouldDirty: true })
-            }
-          />
-        </div>
-        {hasBank ? (
-          <div className="space-y-1 rounded-md border border-slate-200 bg-white p-3 text-xs text-slate-700">
-            {bankName ? <p className="font-medium">{bankName}</p> : null}
-            {bankAcc ? <p>A/C: {bankAcc}</p> : null}
-            {bankIfsc ? <p>IFSC: {bankIfsc}</p> : null}
-            {bankBranch ? <p>Branch: {bankBranch}</p> : null}
-          </div>
-        ) : (
-          <p className="text-xs text-slate-400">No bank details on file.</p>
-        )}
 
-        <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2.5">
-          <span className="flex items-center gap-2 text-xs font-medium text-slate-700">
-            <Smartphone className="h-3.5 w-3.5" /> Show UPI on document
-          </span>
-          <Switch
-            checked={showUpi}
-            disabled={!hasUpi}
-            onCheckedChange={(v) =>
-              setValue("showUPIDetails", v, { shouldDirty: true })
-            }
-          />
-        </div>
-        {hasUpi ? (
-          <div className="rounded-md border border-slate-200 bg-white p-3 text-xs text-slate-700">
-            UPI: {upiId}
-          </div>
-        ) : (
-          <p className="text-xs text-slate-400">No UPI on file.</p>
-        )}
+   
+<div className="space-y-3">
+  {/* Bank Details */}
+  <div className="rounded-lg border border-slate-200 bg-white p-3">
+    <div className="mb-3 flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <Landmark className="h-4 w-4 text-primary" />
+        <span className="text-sm font-semibold text-slate-800">
+          Bank Details
+        </span>
       </div>
 
+      <button
+        type="button"
+        disabled={!hasBank}
+        onClick={() =>
+          setValue("showBankDetails", !showBank, {
+            shouldDirty: true,
+          })
+        }
+        className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md bg-primary/10 text-primary"
+        title={showBank ? "Hide in Quotation" : "Show in Quotation"}
+      >
+        {showBank ? (
+          <Eye className="h-4 w-4" />
+        ) : (
+          <EyeOff className="h-4 w-4" />
+        )}
+      </button>
+    </div>
+
+    {hasBank ? (
+      <div className="space-y-2 rounded-md border border-slate-100 bg-slate-50/50 p-3 text-xs">
+        <div className="flex cursor-pointer items-center justify-between border-b border-slate-100 pb-2">
+          <span className="text-slate-400">Bank Name</span>
+          <span className="font-medium text-slate-700">
+            {showBank ? bankName : maskValue(bankName)}
+          </span>
+        </div>
+
+        <div className="flex cursor-pointer items-center justify-between border-b border-slate-100 pb-2">
+          <span className="text-slate-400">Account Number</span>
+          <span className="font-medium text-slate-700">
+            {showBank ? bankAcc : maskValue(bankAcc)}
+          </span>
+        </div>
+
+        <div className="flex cursor-pointer items-center justify-between border-b border-slate-100 pb-2">
+          <span className="text-slate-400">IFSC</span>
+          <span className="font-medium text-slate-700">
+            {showBank ? bankIfsc : maskValue(bankIfsc)}
+          </span>
+        </div>
+
+        <div className="flex cursor-pointer items-center justify-between">
+          <span className="text-slate-400">Branch</span>
+          <span className="font-medium text-slate-700">
+            {showBank ? bankBranch : maskValue(bankBranch)}
+          </span>
+        </div>
+      </div>
+    ) : (
+      <p className="cursor-pointer text-xs text-slate-400">
+        No bank details on file.
+      </p>
+    )}
+  </div>
+
+  {/* UPI Details */}
+  <div className="rounded-lg border border-slate-200 bg-white p-3">
+    <div className="mb-3 flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <Smartphone className="h-4 w-4 text-primary" />
+        <span className="text-sm font-semibold text-slate-800">
+          UPI Details
+        </span>
+      </div>
+
+      <button
+        type="button"
+        disabled={!hasUpi}
+        onClick={() =>
+          setValue("showUPIDetails", !showUpi, {
+            shouldDirty: true,
+          })
+        }
+        className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md bg-primary/10 text-primary"
+        title={showUpi ? "Hide in Quotation" : "Show in Quotation"}
+      >
+        {showUpi ? (
+          <Eye className="h-4 w-4" />
+        ) : (
+          <EyeOff className="h-4 w-4" />
+        )}
+      </button>
+    </div>
+
+    {hasUpi ? (
+      <div className="rounded-md border border-slate-100 bg-slate-50/50 p-3 text-xs">
+        <div className="flex cursor-pointer items-center justify-between">
+          <span className="text-slate-400">UPI ID</span>
+          <span className="font-medium text-slate-700">
+            {showUpi ? upiId : maskValue(upiId)}
+          </span>
+        </div>
+      </div>
+    ) : (
+      <p className="cursor-pointer text-xs text-slate-400">
+        No UPI details on file.
+      </p>
+    )}
+  </div>
+</div>
       {/* Dates */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FormField label="Quotation date" required>

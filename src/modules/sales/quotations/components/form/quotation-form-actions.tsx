@@ -84,7 +84,7 @@ export function QuotationFormActions({
             : null;
 
   return (
-    <div className="sticky bottom-0 z-10 border-t border-slate-200 bg-white/95 px-3 py-3 backdrop-blur sm:px-6">
+    <div className="sticky bottom-0 z-10 border-t border-slate-200 bg-white/95 px-3 py-3 backdrop-blur sm:px-6 rounded-md">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         {/* Left: Back */}
         <div className="flex items-center gap-2">
@@ -146,11 +146,7 @@ export function QuotationFormActions({
           )}
         </div>
       </div>
-      {!readOnly && hint ? (
-        <p className="mt-2 text-center text-[11px] text-slate-500 sm:text-right">
-          {hint}
-        </p>
-      ) : null}
+   
     </div>
   );
 }

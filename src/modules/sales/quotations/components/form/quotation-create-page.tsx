@@ -11,8 +11,7 @@ export default function QuotationCreatePage() {
     <div className=" space-y-6 ">
       <FormPageHeader
         title="New quotation"
-        description="Customer, issuer, items, and payment"
-      />
+         description="Fill in the details to create a quotation"      />
       <QuotationForm
         mode="create"
         onSuccess={(q) => router.push(`/sales/quotations/${q.id}`)}

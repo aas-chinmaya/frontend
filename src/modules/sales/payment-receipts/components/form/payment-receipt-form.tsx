@@ -240,9 +240,7 @@ export default function PaymentReceiptForm({
           <div className="grid gap-4 sm:grid-cols-2">
             {/* Customer search only — name / phone / GSTIN stored, not shown */}
             <div className="space-y-1 sm:col-span-2">
-              <Label className="text-xs text-slate-600">
-                Customer <span className="text-red-500">*</span>
-              </Label>
+        
               <CustomerSearchSelect onSelect={fillFromCustomer} />
               {customerName ? (
                 <p className="text-xs text-slate-500">

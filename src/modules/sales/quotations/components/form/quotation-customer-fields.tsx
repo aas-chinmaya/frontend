@@ -132,7 +132,7 @@ export function QuotationCustomerFields() {
 
         <div className="space-y-1 sm:col-span-2">
           <Label className="text-xs text-slate-600">
-            Address <span className="text-red-500">*</span>
+            Address  <span className="text-red-500">*</span>
           </Label>
           <Input className="h-9" maxLength={300} {...register("prospectAddressLine1")} />
         </div>
@@ -158,7 +158,7 @@ export function QuotationCustomerFields() {
 
         <div className="space-y-1">
           <Label className="text-xs text-slate-600">
-            State <span className="text-red-500">*</span>
+             State / UT <span className="text-red-500">*</span>
           </Label>
           <Select
             value={stateValue(prospectState)}

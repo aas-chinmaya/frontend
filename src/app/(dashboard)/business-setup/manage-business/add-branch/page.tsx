@@ -49,11 +49,14 @@ export default function AddBranchPage() {
 	const business = businesses.find((record) => String(record.id) === businessId);
 
 	const handleSubmit = async (data: BranchFormData) => {
+		if (!branchId && (!data.users || data.users.length === 0)) {
+			throw new Error("At least one branch user is required.");
+		}
+
 		const payload = {
 			branchName: data.branchName,
 			branchCode: data.branchCode,
 			addressLine1: data.address1,
-			branchManager: data.branchManager,
 			phone: data.phone,
 			email: data.email,
 			pincode: data.pincode,
@@ -67,6 +70,13 @@ export default function AddBranchPage() {
 			note: data.note,
 			openingDate: data.openingDate || undefined,
 			isActive: data.status.toUpperCase() === "ACTIVE",
+			users: !branchId ? data.users.map((user) => ({
+				fullName: user.fullName,
+				email: user.email,
+				password: user.password,
+				contact: user.contact,
+				roleId: user.roleId,
+			})) : undefined,
 		};
 
 		if (branchId) {
@@ -77,7 +87,8 @@ export default function AddBranchPage() {
 			throw new Error("Business tenant is missing.");
 		}
 
-		router.push("/business-setup/manage-business");
+		const redirectTo = `/business-setup/manage-business/view?id=${businessId ?? business?.id ?? ""}`;
+		router.push(redirectTo);
 	};
 
 	if (!businessId) {
@@ -111,12 +122,10 @@ export default function AddBranchPage() {
 					branchCode: String(branch.branchCode ?? ""),
 					status: String(branch.status ?? "ACTIVE").toUpperCase() === "INACTIVE" ? "Inactive" : "Active",
 					address1: String(branch.addressLine1 ?? ""),
-					// address2: String(branch.addressLine2 ?? ""),
 					country: String(branch.country ?? "India"),
 					state: String(branch.state ?? ""),
 					city: String(branch.city ?? ""),
 					pincode: String(branch.pincode ?? ""),
-					branchManager: String(branch.branchManager ?? ""),
 					phone: String(branch.phone ?? ""),
 					email: String(branch.email ?? ""),
 					licenseNumber: String(branch.licenseNumber ?? ""),
@@ -124,6 +133,24 @@ export default function AddBranchPage() {
 					PAN: String(branch.PAN ?? ""),
 					openingDate: branch.openingDate ? String(branch.openingDate).slice(0, 10) : "",
 					note: String(branch.note ?? ""),
+					users: (() => {
+						const branchUsers = Array.isArray(branch.users) ? branch.users : [];
+						return branchUsers.length > 0
+							? branchUsers.map((user: Record<string, unknown>) => ({
+								fullName: String(user.fullName ?? user.name ?? ""),
+								email: String(user.email ?? ""),
+								password: "",
+								contact: String(user.contact ?? ""),
+								roleId: String(user.roleId ?? ""),
+							}))
+							: [{
+								fullName: "",
+								email: "",
+								password: "",
+								contact: "",
+								roleId: "",
+							}];
+					})(),
 				} : undefined}
 				onCancel={() => router.push("/business-setup/manage-business")}
 				onSubmit={handleSubmit}
